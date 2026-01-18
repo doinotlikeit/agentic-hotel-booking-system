@@ -181,8 +181,8 @@ public class ADKAgent {
                             if (event.content().isPresent()
                                     && event.content().get().parts().isPresent()
                                     && !event.content().get().parts().get().isEmpty()
-                                    && event.content().get().parts().get().get(0).text().isPresent()) {
-                                String finalResponse = event.content().get().parts().get().get(0).text().get().trim();
+                                    && event.content().get().parts().get().getFirst().text().isPresent()) {
+                                String finalResponse = event.content().get().parts().get().getFirst().text().get().trim();
                                 log.info("*** Final Agent Response: [{}]", finalResponse);
                             } else {
                                 log.info("*** Final Agent Response: [No text content in final event]");
