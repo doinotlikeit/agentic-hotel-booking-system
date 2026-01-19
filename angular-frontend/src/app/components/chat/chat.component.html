@@ -1,0 +1,156 @@
+<div class="chat-container">
+  <!-- Header -->
+  <div class="chat-header">
+    <div class="header-left">
+      <mat-icon class="app-icon">smart_toy</mat-icon>
+      <span class="app-title">{{ appTitle }}</span>
+    </div>
+    <div class="header-right">
+      <mat-chip
+        [class.status-connected]="connectionStatus === 'Connected'"
+        [class.status-error]="connectionStatus === 'Error'"
+        [class.status-connecting]="connectionStatus === 'Connecting...'"
+      >
+        <mat-icon>{{
+          connectionStatus === "Connected"
+            ? "wifi"
+            : connectionStatus === "Error"
+              ? "wifi_off"
+              : "sync"
+        }}</mat-icon>
+        {{ connectionStatus }}
+      </mat-chip>
+    </div>
+  </div>
+
+  <!-- Separator -->
+  <mat-divider></mat-divider>
+
+  <!-- Session Info -->
+  <div class="session-info">
+    <mat-icon class="info-icon">info</mat-icon>
+    <span class="info-text">{{ getSessionInfo() }}</span>
+  </div>
+
+  <!-- Message Area -->
+  <div class="message-area" #messageContainer>
+    <div *ngIf="messages.length === 0" class="empty-state">
+      <mat-icon class="empty-icon">chat_bubble_outline</mat-icon>
+      <p class="empty-text">Start a conversation with the agent</p>
+      <p class="empty-subtext">{{ emptyStateHint }}</p>
+    </div>
+
+    <div
+      *ngFor="let message of messages"
+      class="message-wrapper"
+      [class.user-message]="message.type === 'user'"
+      [class.agent-message]="message.type === 'agent'"
+    >
+      <div class="message-bubble">
+        <div class="message-header">
+          <mat-icon class="message-icon">
+            {{ message.type === "user" ? "person" : "smart_toy" }}
+          </mat-icon>
+          <span class="message-sender">{{
+            message.type === "user" ? "You" : "Agent"
+          }}</span>
+          <span class="message-timestamp">{{
+            formatTimestamp(message.timestamp)
+          }}</span>
+        </div>
+        <div class="message-content">
+          <!-- Render A2UI with Angular components -->
+          <div *ngIf="hasA2UIContent(message)" class="a2ui-container">
+            <ng-container *ngFor="let component of getA2UIComponents(message)">
+              <!-- JSON Tree Component -->
+              <div *ngIf="component.type === 'json'" class="a2ui-json">
+                <div class="a2ui-json-label" *ngIf="component.label">
+                  {{ component.label }}
+                </div>
+
+                <!-- Tree View using Angular Material (always use tree when available) -->
+                <div
+                  class="a2ui-json-tree-wrapper"
+                  *ngIf="component.mode === 'tree' || component.mode === 'both'"
+                >
+                  <app-a2u-json-tree
+                    [data]="component.data"
+                    [collapsed]="component.collapsed !== false"
+                  >
+                  </app-a2u-json-tree>
+                </div>
+              </div>
+
+              <!-- Other A2UI components rendered as HTML -->
+              <div
+                *ngIf="component.type !== 'json'"
+                [innerHTML]="renderSingleComponent(component)"
+              ></div>
+            </ng-container>
+          </div>
+
+          <!-- Render markdown content if no A2UI metadata -->
+          <div
+            *ngIf="!hasA2UIContent(message)"
+            [innerHTML]="renderMessageContent(message)"
+            class="markdown-content"
+          ></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Thinking Indicator -->
+    <div *ngIf="isThinking" class="thinking-indicator">
+      <div class="thinking-bubble">
+        <div class="thinking-header">
+          <mat-icon class="thinking-icon">smart_toy</mat-icon>
+          <span class="thinking-sender">Agent</span>
+        </div>
+        <div class="thinking-content">
+          <div class="thinking-dots">
+            <span class="dot"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+          </div>
+          <span class="thinking-text">{{ thinkingMessage }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Input Area -->
+  <div class="input-area">
+    <div style="width: 100%">
+      <mat-form-field class="message-input-field" appearance="fill">
+        <mat-label>Type your message...</mat-label>
+        <textarea
+          matInput
+          #messageInput
+          [(ngModel)]="currentMessage"
+          (keydown)="onKeyDown($event)"
+          placeholder="Type your message here..."
+          rows="2"
+          [disabled]="connectionStatus !== 'Connected'"
+        >
+        </textarea>
+      </mat-form-field>
+    </div>
+
+    <div class="button-group">
+      <button
+        mat-raised-button
+        color="primary"
+        (click)="sendMessage()"
+        [disabled]="!currentMessage.trim() || connectionStatus !== 'Connected'"
+      >
+        <mat-icon>send</mat-icon>
+        Send
+      </button>
+
+      <button mat-raised-button color="warn" (click)="clearMessages()">
+        <mat-icon>clear_all</mat-icon>
+        Clear
+      </button>
+    </div>
+  </div>
+</div>

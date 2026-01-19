@@ -1,8 +1,0 @@
-/home/rcooray/projects/hotel-booking-system/a2a-booking-backend/src/main/java/com/hotel/a2a/A2aBookingApplication.java
-/home/rcooray/projects/hotel-booking-system/a2a-booking-backend/src/main/java/com/hotel/a2a/controller/A2AController.java
-/home/rcooray/projects/hotel-booking-system/a2a-booking-backend/src/main/java/com/hotel/a2a/model/BookHotelResponse.java
-/home/rcooray/projects/hotel-booking-system/a2a-booking-backend/src/main/java/com/hotel/a2a/protocol/A2ATask.java
-/home/rcooray/projects/hotel-booking-system/a2a-booking-backend/src/main/java/com/hotel/a2a/protocol/AgentCard.java
-/home/rcooray/projects/hotel-booking-system/a2a-booking-backend/src/main/java/com/hotel/a2a/protocol/JsonRpcRequest.java
-/home/rcooray/projects/hotel-booking-system/a2a-booking-backend/src/main/java/com/hotel/a2a/protocol/JsonRpcResponse.java
-/home/rcooray/projects/hotel-booking-system/a2a-booking-backend/src/main/java/com/hotel/a2a/service/BookingService.java

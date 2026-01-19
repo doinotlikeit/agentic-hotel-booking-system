@@ -1,10 +1,43 @@
 # Hotel Booking System - AI Agent Application
 
-A full-stack AI-powered hotel booking system with Angular frontend and Spring Boot ADK-based agent backend.
+A full-stack AI-powered hotel booking system demonstrating multi-agent architecture with Angular frontend, Spring Boot ADK root agent, MCP tools server, and A2A booking agent.
 
 ## Architecture Overview
 
-### Frontend (Angular)
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           Hotel Booking System                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌───────────────────┐        WebSocket       ┌───────────────────────┐     │
+│  │  Angular Frontend │◄──────────────────────►│   ADK Root Agent      │     │
+│  │  (Port 4200)      │                        │   (Port 8080)         │     │
+│  │                   │                        │                       │     │
+│  │  - Chat UI        │                        │  - Google ADK SDK     │     │
+│  │  - AG-UI Protocol │                        │  - Gemini/Vertex AI   │     │
+│  │  - A2U Components │                        │  - Tool Discovery     │     │
+│  └───────────────────┘                        │  - Session Management │     │
+│                                               └───────────┬───────────┘     │
+│                                                           │                 │
+│                              ┌────────────────────────────┼                 │
+│                              │                            │                 │
+│                              ▼                            ▼                 │
+│                 ┌─────────────────────┐     ┌─────────────────────────┐     │
+│                 │  MCP Hotel Tools    │     │  A2A Booking Agent      │     │
+│                 │  (Port 8081)        │     │  (Port 8082)            │     │
+│                 │                     │     │                         │     │
+│                 │  - searchHotels     │     │  - book-hotel skill     │     │
+│                 │  - getHotelPrice    │     │  - A2A Protocol         │     │
+│                 │  - MCP Protocol     │     │  - JSON-RPC             │     │
+│                 └─────────────────────┘     └─────────────────────────┘     │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+## Projects
+
+### 1. Angular Frontend (`angular-frontend/`)
+- **Port**: 4200
 - **Framework**: Angular 17 with Material Design
 - **Key Features**:
   - Polished conversational UI with real-time messaging
@@ -13,25 +46,48 @@ A full-stack AI-powered hotel booking system with Angular frontend and Spring Bo
   - Message history with arrow key navigation
   - AG-UI protocol implementation for agent communication
   - A2U (Agent-to-UI) components for rich interactions
+  - Thinking indicator for agent processing status
 
-### Agent Backend (Spring Boot)
+### 2. ADK Root Agent (`adk-root-agent/`)
+- **Port**: 8080
 - **Framework**: Spring Boot 3.2 with WebSocket support
 - **Agent Architecture**: Google Cloud ADK (Agentic Development Kit) v0.5.0
   - **ADKAgent**: Main agent implementation with LlmAgent
-  - **Tool Classes**: BaseTool implementations for hotel operations
-    - SearchHotelsTool - Hotel search with filters
-    - BookHotelTool - Hotel booking with confirmation
-    - GetHotelPriceTool - Pricing calculations
-  - **Runner**: Per-request execution with InMemorySessionService
+  - **Tool Discovery Service**: Background polling for MCP and A2A tools
+  - **Dynamic Tool Registration**: Tools registered as they become available
   - **Gemini Model**: Direct Vertex AI integration via ADK Client
   - **Event Streaming**: RxJava subscribe pattern for real-time responses
 - **Key Features**:
-  - Single agent architecture with integrated tools
+  - Orchestrates MCP tools and A2A agents
+  - Continuous tool discovery with retry logic
   - Real-time streaming responses
   - Session-based conversation history
-  - Tool-equipped AI with function calling
+  - Friendly error messages when services unavailable
   - Ping/pong heartbeat mechanism
-  - Comprehensive error handling
+
+### 3. MCP Hotel Tools (`mcp-hotel-tools/`)
+- **Port**: 8081
+- **Framework**: Spring Boot 3.4.1 with Spring AI MCP
+- **Protocol**: Model Context Protocol (MCP)
+- **Tools Exposed**:
+  - `searchHotels` - Search hotels by destination with filters (minRating, maxPrice)
+  - `getHotelPrice` - Calculate hotel pricing including taxes
+- **Key Features**:
+  - Standardized MCP tool interface
+  - Mock hotel data for demonstration
+  - JSON-RPC communication
+
+### 4. A2A Booking Agent (`a2a-booking-agent/`)
+- **Port**: 8082
+- **Framework**: Spring Boot 3.4.1
+- **Protocol**: Agent-to-Agent (A2A) Protocol
+- **Skills Exposed**:
+  - `book-hotel` - Book a hotel room with guest details
+- **Key Features**:
+  - Agent Card discovery via `/.well-known/agent.json`
+  - JSON-RPC task execution via `/a2a` endpoint
+  - Booking confirmation with reference numbers
+  - Standardized A2A protocol implementation
 
 ## Technology Stack
 
@@ -43,111 +99,147 @@ A full-stack AI-powered hotel booking system with Angular frontend and Spring Bo
 - WebSocket for real-time communication
 - TypeScript
 
-### Agent Backend
-- Spring Boot 3.2
-- Spring WebSocket
-- Spring Boot DevTools & Actuator
-- Google Cloud ADK 0.5.0 (Agentic Development Kit)
-  - LLMAgent base class
-  - InMemoryRunner for orchestration
-  - InMemorySession for state
-  - FunctionDeclaration for tools
-  - MCPClient for remote tools
+### Backend (All Services)
+- Spring Boot 3.2/3.4
+- Spring WebSocket (ADK Root Agent)
+- Spring AI MCP (MCP Hotel Tools)
+- Google Cloud ADK 0.5.0 (ADK Root Agent)
 - Jackson for JSON processing
-- SLF4J for logging
 - Lombok for boilerplate reduction
+- Java 21
 
 ## Project Structure
 
 ```
 hotel-booking-system/
-├── frontend/
+├── angular-frontend/           # Angular 17 frontend
 │   ├── src/
 │   │   ├── app/
 │   │   │   ├── components/
-│   │   │   │   ├── chat/          # Main chat interface
-│   │   │   │   └── a2u/           # Agent-to-UI components
-│   │   │   ├── services/
-│   │   │   │   ├── websocket.service.ts    # WebSocket management
-│   │   │   │   └── ag-ui.service.ts        # AG-UI protocol
-│   │   │   └── app.module.ts
-│   │   ├── styles.scss
-│   │   └── index.html
+│   │   │   │   ├── chat/       # Main chat interface
+│   │   │   │   └── a2u/        # Agent-to-UI components
+│   │   │   └── services/
+│   │   │       ├── websocket.service.ts
+│   │   │       └── ag-ui.service.ts
 │   ├── package.json
-│   ├── angular.json
-│   └── tailwind.config.js
+│   └── angular.json
 │
-└── agent-backend/
-    ├── src/main/java/com/hotel/booking/
-    │   ├── agent/
-    │   │   └── ADKAgent.java              # Main agent implementation
-    │   ├── tools/
-    │   │   ├── SearchHotelsTool.java      # Hotel search tool
-    │   │   ├── BookHotelTool.java         # Booking tool
-    │   │   └── GetHotelPriceTool.java     # Pricing tool
-    │   ├── config/
-    │   │   ├── WebSocketConfig.java
-    │   │   └── AgentConfig.java
-    │   ├── model/
-    │   │   ├── AgentMessage.java
-    │   │   ├── AgentEvent.java
-    │   │   ├── AgentSessionState.java
-    │   │   └── Hotel.java
-    │   ├── service/
-    │   │   └── SessionManager.java        # Session state management
-    │   ├── websocket/
-    │   │   └── AgentWebSocketHandler.java
-    │   └── HotelBookingAgentApplication.java
-    ├── src/main/resources/
-    │   └── application.properties
-    └── pom.xml
-
+├── adk-root-agent/             # Google ADK root agent
+│   ├── src/main/java/com/hotel/booking/
+│   │   ├── agent/
+│   │   │   ├── ADKAgent.java           # Main agent
+│   │   │   └── ToolDiscoveryService.java
+│   │   ├── mcp/
+│   │   │   ├── McpClient.java          # MCP client
+│   │   │   └── McpToolAdapter.java     # MCP to ADK adapter
+│   │   ├── a2a/
+│   │   │   ├── A2AClient.java          # A2A client
+│   │   │   └── A2AToolAdapter.java     # A2A to ADK adapter
+│   │   ├── websocket/
+│   │   │   └── AgentWebSocketHandler.java
+│   │   └── util/
+│   │       └── A2UIBuilder.java        # A2UI response builder
+│   └── pom.xml
+│
+├── mcp-hotel-tools/            # MCP server for hotel tools
+│   ├── src/main/java/com/hotel/mcp/
+│   │   ├── tools/
+│   │   │   ├── SearchHotelsTool.java
+│   │   │   └── GetHotelPriceTool.java
+│   │   └── HotelMcpServerApplication.java
+│   └── pom.xml
+│
+├── a2a-booking-agent/          # A2A agent for booking
+│   ├── src/main/java/com/hotel/a2a/
+│   │   ├── A2AController.java          # JSON-RPC endpoint
+│   │   ├── AgentCardController.java    # Discovery endpoint
+│   │   └── BookingService.java         # Booking logic
+│   └── pom.xml
+│
+└── docker-compose.yml          # Container orchestration
 ```
 
 ## Setup Instructions
 
 ### Prerequisites
 - Node.js 18+ and npm
-- Java 17+
+- Java 21+
 - Maven 3.6+
+- GCP Project with Vertex AI enabled (for ADK Root Agent)
 
-### Frontend Setup
+### Quick Start (All Services)
 
-1. Navigate to the frontend directory:
+1. **Set environment variables** (required for ADK):
 ```bash
-cd frontend
+export GOOGLE_CLOUD_PROJECT=your-gcp-project-id
+export GOOGLE_CLOUD_LOCATION=us-central1
 ```
 
-2. Install dependencies:
+2. **Start MCP Hotel Tools** (Port 8081):
 ```bash
+cd mcp-hotel-tools
+mvn spring-boot:run
+```
+
+3. **Start A2A Booking Agent** (Port 8082):
+```bash
+cd a2a-booking-agent
+mvn spring-boot:run
+```
+
+4. **Start ADK Root Agent** (Port 8080):
+```bash
+cd adk-root-agent
+mvn spring-boot:run
+```
+
+5. **Start Angular Frontend** (Port 4200):
+```bash
+cd angular-frontend
 npm install
-```
-
-3. Start the development server:
-```bash
 npm start
 ```
 
-The application will be available at `http://localhost:4200`
+6. **Open the application**: http://localhost:4200
 
-### Agent Backend Setup
+### Using Docker Compose
 
-1. Navigate to the agent-backend directory:
 ```bash
-cd agent-backend
+docker-compose up --build
 ```
 
-2. **Configure environment variables (REQUIRED for ADK)**:
-```bash
-# Required: GCP Project ID and Location for VertexAI
-export GCP_PROJECT_ID=your-gcp-project-id
-export GCP_LOCATION=us-central1
+### Individual Service Setup
 
-# Optional: Set Google Application Credentials if needed
-export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
+#### Angular Frontend
+```bash
+cd angular-frontend
+npm install
+npm start
+# Available at http://localhost:4200
 ```
 
-3. Build the application:
+#### ADK Root Agent
+```bash
+cd adk-root-agent
+export GOOGLE_CLOUD_PROJECT=your-gcp-project-id
+export GOOGLE_CLOUD_LOCATION=us-central1
+mvn spring-boot:run
+# Available at http://localhost:8080
+```
+
+#### MCP Hotel Tools
+```bash
+cd mcp-hotel-tools
+mvn spring-boot:run
+# Available at http://localhost:8081
+```
+
+#### A2A Booking Agent
+```bash
+cd a2a-booking-agent
+mvn spring-boot:run
+# Available at http://localhost:8082
+```
 ```bash
 mvn clean install
 ```
@@ -168,187 +260,171 @@ The agent backend will be available at `http://localhost:8080`
 
 ### User Experience
 1. **Hotel Search**: Users can search for hotels in any destination
-2. **Execution Plan**: Agent presents a clear plan before executing actions
-3. **Multi-Step Interaction**: Sequential execution of search and booking
-4. **Comprehensive Summary**: Final summary of all actions taken
-5. **Error Handling**: User-friendly error messages
+2. **Pricing Information**: Get detailed pricing with taxes
+3. **Hotel Booking**: Book hotels with confirmation reference
+4. **Multi-Agent Architecture**: Seamless coordination between services
+5. **Error Handling**: Friendly messages when services are unavailable
 
 ### Technical Features
 
-#### AG-UI Protocol
+#### AG-UI Protocol (Frontend ↔ ADK Agent)
 - `run_started`: Agent execution begins
-- `run`: Agent processing events
+- `run`: Agent processing events  
 - `chat`: Conversational responses
 - `error`: Error notifications
 - `complete`: Execution completion
 
-#### A2U Components
+#### MCP Protocol (ADK Agent ↔ MCP Server)
+- Tool discovery via `/mcp` endpoint
+- JSON-RPC tool invocation
+- Standardized tool schemas
+
+#### A2A Protocol (ADK Agent ↔ A2A Agent)
+- Agent discovery via `/.well-known/agent.json`
+- Skill-based task delegation
+- JSON-RPC task execution
+
+#### A2U Components (Agent-to-UI)
 - **Card**: Container component for structured content
 - **Text**: Typography with variants (heading, body, caption)
 - **Grid**: Flexible grid layout system
-- **Button**: Interactive buttons with icons and variants
+- **Button**: Interactive buttons with icons
+- **JsonTree**: Expandable JSON visualization
 
-#### ADK Integration
-- **LLMAgent**: Base agent class with VertexAI integration
-- **InMemoryRunner**: Event-driven execution with runAsync()
-- **InMemorySession**: Session state management
-- **ToolContext**: Context passing between agents
-- **FunctionDeclaration**: Tool/function registration
-- **FunctionResult**: Tool execution results
-- **MCPClient**: Remote MCP tool discovery and execution
-- **Event Loop**: Processing AgentEvents (RunStartedEvent, ChatResponseEvent, RunCompleteEvent)
-- **Sequential Execution**: Root agent orchestrates sub-agents in sequence
-
-### WebSocket Communication
-- Persistent connection with auto-reconnect
-- Ping/pong heartbeat (30s interval)
-- Message acknowledgment
-- Connection status monitoring
+### Tool Discovery
+- Background polling service (every 10 seconds)
+- Dynamic tool registration when services come online
+- Graceful degradation when services unavailable
+- Friendly user messages indicating service status
 
 ## Usage Examples
 
 ### Example 1: Search for Hotels
 ```
 User: Search for hotels in Paris
-Agent: [Presents plan]
-Agent: [Executes MCP search tool]
-Agent: [Displays results as JSON]
-Agent: [Provides summary]
+Agent: [Calls MCP searchHotels tool]
+Agent: [Displays hotel results with ratings and prices]
 ```
 
-### Example 2: Book a Hotel
+### Example 2: Get Hotel Price
 ```
-User: Book the Grand Paris Hotel
-Agent: [Presents plan]
-Agent: [Executes local booking tool]
-Agent: [Confirms booking with ID]
-Agent: [Provides summary]
+User: What's the price for Grand Hotel Paris for 3 nights?
+Agent: [Calls MCP getHotelPrice tool]
+Agent: [Shows price breakdown with taxes]
 ```
 
-### Example 3: Search and Book
+### Example 3: Book a Hotel
 ```
-User: Find and book a hotel in Tokyo
-Agent: [Presents plan]
-Agent: [Executes MCP search tool]
-Agent: [Displays results]
-Agent: [Executes local booking tool]
-Agent: [Provides comprehensive summary]
+User: Book Grand Hotel Paris for John Smith, check-in Jan 25, 2 nights
+Agent: [Calls A2A book-hotel skill]
+Agent: ✅ Booking Confirmed!
+       - Booking Reference: BK-12345
+       - Hotel: Grand Hotel Paris
+       - Guest: John Smith
+       - Check-in: 2026-01-25
+       - Check-out: 2026-01-27
+       - Total Price: $450.00
 ```
 
 ## API Endpoints
 
-### WebSocket
-- **Endpoint**: `ws://localhost:8080/agent`
-- **Protocol**: AG-UI
-- **Message Format**: JSON
+### Angular Frontend
+- **URL**: http://localhost:4200
 
-### REST (Actuator)
+### ADK Root Agent
+- **WebSocket**: `ws://localhost:8080/agent`
 - **Health**: `http://localhost:8080/actuator/health`
-- **Info**: `http://localhost:8080/actuator/info`
-- **Metrics**: `http://localhost:8080/actuator/metrics`
+
+### MCP Hotel Tools
+- **MCP Endpoint**: `http://localhost:8081/mcp`
+- **Health**: `http://localhost:8081/actuator/health`
+
+### A2A Booking Agent
+- **Agent Card**: `http://localhost:8082/.well-known/agent.json`
+- **A2A Endpoint**: `http://localhost:8082/a2a`
+- **Health**: `http://localhost:8082/actuator/health`
+
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `GOOGLE_CLOUD_PROJECT` | Yes | GCP Project ID with Vertex AI enabled |
+| `GOOGLE_CLOUD_LOCATION` | Yes | GCP region (e.g., `us-central1`) |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Optional | Path to service account JSON |
 
 ## Development
 
-### Frontend Development
+### Running All Services
 ```bash
-cd frontend
-npm start           # Start dev server
-npm run build       # Production build
-npm run watch       # Watch mode
+# Terminal 1 - MCP Server
+cd mcp-hotel-tools && mvn spring-boot:run
+
+# Terminal 2 - A2A Agent  
+cd a2a-booking-agent && mvn spring-boot:run
+
+# Terminal 3 - ADK Root Agent
+cd adk-root-agent && mvn spring-boot:run
+
+# Terminal 4 - Frontend
+cd angular-frontend && npm start
 ```
 
-### Agent Backend Development
+### Building for Production
 ```bash
-cd agent-backend
-mvn spring-boot:run           # Run with auto-reload
-mvn clean test                # Run tests
-mvn spring-boot:build-image   # Build Docker image
+# Build all Java services
+cd mcp-hotel-tools && mvn clean package
+cd a2a-booking-agent && mvn clean package
+cd adk-root-agent && mvn clean package
+
+# Build frontend
+cd angular-frontend && npm run build
 ```
 
 ## Design Decisions
 
+### Why Multi-Agent Architecture?
+- **Separation of Concerns**: Each service has a single responsibility
+- **Scalability**: Services can be scaled independently
+- **Protocol Standards**: MCP and A2A are industry-standard protocols
+- **Flexibility**: Easy to add new tools or agents
+
 ### Why Google Cloud ADK?
 - Official Google agentic framework for production use
-- Native VertexAI and Gemini integration
+- Native Vertex AI and Gemini integration
 - Built-in event-driven architecture
-- InMemoryRunner for orchestration
 - Strong typing and structured tool definitions
-- MCP (Model Context Protocol) support for remote tools
 
-### Why InMemoryRunner?
-- Event-driven execution model (runAsync)
-- Non-blocking agent orchestration
-- Clean event handling (RunStartedEvent, ChatResponseEvent, etc.)
-- Perfect for sequential sub-agent execution
-- No manual thread management needed
+### Why MCP for Tools?
+- Standardized tool discovery and invocation
+- Language-agnostic protocol
+- Growing ecosystem support
 
-### Why Sequential Sub-Agent Execution?
-- Predictable execution flow
-- Better error handling
-- Clearer user feedback
-- Matches ADK InMemoryRunner patterns
-
-### Why WebSocket?
-- Real-time bidirectional communication
-- Lower latency than polling
-- Better for conversational interfaces
-- Efficient for event streaming
-
-## Future Enhancements
-
-1. **Authentication & Authorization**
-   - User login/signup
-   - JWT token management
-   - Role-based access control
-
-2. **Database Integration**
-   - PostgreSQL for persistence
-   - Redis for caching
-   - Session storage
-
-3. **Real MCP Integration**
-   - Connect to actual MCP servers
-   - Tool discovery mechanism
-   - OAuth for external APIs
-
-4. **Advanced Features**
-   - Payment processing
-   - Email notifications
-   - Booking history
-   - User preferences
-
-5. **Monitoring & Analytics**
-   - Application metrics
-   - User behavior tracking
-   - Error monitoring
-   - Performance optimization
+### Why A2A for Agent Communication?
+- Google's standard for agent-to-agent communication
+- Skill-based capability discovery
+- Asynchronous task execution support
 
 ## Troubleshooting
 
-### Frontend Issues
+### Services Not Discovered
+The ADK Root Agent polls for MCP and A2A services every 10 seconds. If services aren't available:
+1. Verify MCP server is running on port 8081
+2. Verify A2A agent is running on port 8082
+3. Check logs: `tail -f /tmp/mcp.log` or `/tmp/a2a.log`
 
-**WebSocket won't connect**
-- Check agent backend is running on port 8080
-- Verify CORS settings in agent backend
-- Check browser console for errors
-
-**Messages not appearing**
-- Check WebSocket connection status
-- Verify message format matches protocol
-- Check browser console for errors
-
-### Agent Backend Issues
-
-**Port already in use**
+### GCP Authentication Issues
 ```bash
-# Change port in application.properties
-server.port=8081
+# Verify credentials
+gcloud auth application-default login
+
+# Or set service account
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json
 ```
 
-**WebSocket connection refused**
-- Check firewall settings
-- Verify WebSocket configuration
-- Check CORS allowed origins
+### WebSocket Connection Failed
+- Ensure ADK Root Agent is running on port 8080
+- Check browser console for CORS errors
+- Verify no firewall blocking WebSocket connections
 
 ## Contributing
 

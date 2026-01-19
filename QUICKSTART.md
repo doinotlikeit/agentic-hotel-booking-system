@@ -44,7 +44,7 @@ export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
 
 ### 3. Configure Application Properties
 
-Edit `agent-backend/src/main/resources/application.properties`:
+Edit `adk-root-agent/src/main/resources/application.properties`:
 
 ```properties
 # Google Cloud Configuration
@@ -67,9 +67,9 @@ export GCP_LOCATION=us-central1
 
 ## Option 1: Local Development
 
-### Start Agent Backend
+### Start ADK Root Agent
 ```bash
-cd agent-backend
+cd adk-root-agent
 
 # Set environment variables (REQUIRED)
 export GCP_PROJECT_ID=your-project-id
@@ -79,9 +79,9 @@ export GCP_LOCATION=us-central1
 mvn spring-boot:run
 ```
 
-### Start Frontend (in new terminal)
+### Start Angular Frontend (in new terminal)
 ```bash
-cd frontend
+cd angular-frontend
 npm install
 npm start
 ```
@@ -177,8 +177,8 @@ npm install
 
 ## Configuration
 
-### Agent Backend Configuration
-Edit: `agent-backend/src/main/resources/application.properties`
+### ADK Root Agent Configuration
+Edit: `adk-root-agent/src/main/resources/application.properties`
 
 ```properties
 # Change port
@@ -196,8 +196,8 @@ adk.max-tokens=2048
 
 **Important**: `GCP_PROJECT_ID` must be set as an environment variable. The ADK SDK uses this to initialize VertexAI.
 
-### Frontend Configuration
-Edit: `frontend/src/environments/environment.ts`
+### Angular Frontend Configuration
+Edit: `angular-frontend/src/environments/environment.ts`
 
 ```typescript
 export const environment = {
@@ -222,8 +222,8 @@ wscat -c ws://localhost:8080/agent
 
 ## Next Steps
 
-1. Customize the UI colors in `frontend/src/styles.scss`
-2. Add more agent tools in the agent-backend
+1. Customize the UI colors in `angular-frontend/src/styles.scss`
+2. Add more agent tools in the adk-root-agent
 3. Integrate with real MCP servers
 4. Add authentication
 5. Implement database persistence

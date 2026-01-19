@@ -1,9 +1,9 @@
 version: "3.8"
 
 services:
-  agent-backend:
+  adk-root-agent:
     build:
-      context: ./agent-backend
+      context: ./adk-root-agent
       dockerfile: Dockerfile
     ports:
       - "8080:8080"
@@ -12,14 +12,14 @@ services:
       - GCP_PROJECT_ID=${GCP_PROJECT_ID}
       - GCP_LOCATION=${GCP_LOCATION:-us-central1}
       - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials.json
-      - MCP_SERVER_URL=http://mcp-backend:8081
-      - A2A_BOOKING_URL=http://a2a-booking-backend:8082
+      - MCP_SERVER_URL=http://mcp-hotel-tools:8081
+      - A2A_BOOKING_URL=http://a2a-booking-agent:8082
     volumes:
       - ${GOOGLE_APPLICATION_CREDENTIALS}:/app/credentials.json:ro
     depends_on:
-      mcp-backend:
+      mcp-hotel-tools:
         condition: service_healthy
-      a2a-booking-backend:
+      a2a-booking-agent:
         condition: service_healthy
     networks:
       - hotel-booking-network
@@ -30,9 +30,9 @@ services:
       retries: 3
       start_period: 40s
 
-  mcp-backend:
+  mcp-hotel-tools:
     build:
-      context: ./mcp-backend
+      context: ./mcp-hotel-tools
       dockerfile: Dockerfile
     ports:
       - "8081:8081"
@@ -47,9 +47,9 @@ services:
       retries: 3
       start_period: 40s
 
-  a2a-booking-backend:
+  a2a-booking-agent:
     build:
-      context: ./a2a-booking-backend
+      context: ./a2a-booking-agent
       dockerfile: Dockerfile
     ports:
       - "8082:8082"
@@ -64,16 +64,16 @@ services:
       retries: 3
       start_period: 40s
 
-  frontend:
+  angular-frontend:
     build:
-      context: ./frontend
+      context: ./angular-frontend
       dockerfile: Dockerfile
     ports:
       - "4200:80"
     depends_on:
-      - agent-backend
-      - mcp-backend
-      - a2a-booking-backend
+      - adk-root-agent
+      - mcp-hotel-tools
+      - a2a-booking-agent
     networks:
       - hotel-booking-network
 
