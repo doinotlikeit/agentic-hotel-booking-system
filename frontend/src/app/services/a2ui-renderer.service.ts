@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { marked } from 'marked';
 
 export interface A2UIComponent {
   type: string;
@@ -17,7 +18,17 @@ export interface A2UIMetadata {
 })
 export class A2uiRendererService {
 
-  constructor() { }
+  constructor() {
+    this.configureMarked();
+  }
+
+  private configureMarked(): void {
+    // Configure marked options for rendering markdown in A2UI text
+    marked.setOptions({
+      breaks: true,
+      gfm: true
+    });
+  }
 
   /**
    * Check if message contains A2UI metadata
@@ -52,7 +63,7 @@ export class A2uiRendererService {
 
     return metadata.components
       .map(component => this.renderComponent(component))
-      .join('\n');
+      .join('');
   }
 
   /**
@@ -123,21 +134,33 @@ export class A2uiRendererService {
   private renderText(component: A2UIComponent): string {
     const variant = component['variant'] || 'body';
     const align = component['align'] || 'left';
-    return `<p class="a2ui-text a2ui-${variant}" style="text-align: ${align}">${this.escapeHtml(component['content'] || '')}</p>`;
+    const content = component['content'] || '';
+
+    // Parse markdown in the content
+    let renderedContent: string;
+    try {
+      renderedContent = marked.parse(content) as string;
+    } catch (e) {
+      renderedContent = this.escapeHtml(content);
+    }
+
+    return `<div class="a2ui-text a2ui-${variant}" style="text-align: ${align}">${renderedContent}</div>`;
   }
 
   private renderCard(component: A2UIComponent): string {
     const title = component['title'] ? `<h3 class="a2ui-card-title">${this.escapeHtml(component['title'])}</h3>` : '';
     const subtitle = component['subtitle'] ? `<p class="a2ui-card-subtitle">${this.escapeHtml(component['subtitle'])}</p>` : '';
-    const content = `<div class="a2ui-card-content">${this.escapeHtml(component['content'] || '')}</div>`;
+    
+    // Parse markdown in card content for proper formatting
+    let contentHtml: string;
+    try {
+      contentHtml = marked.parse(component['content'] || '') as string;
+    } catch (e) {
+      contentHtml = this.escapeHtml(component['content'] || '');
+    }
+    const content = `<div class="a2ui-card-content">${contentHtml}</div>`;
 
-    return `
-      <div class="a2ui-card">
-        ${title}
-        ${subtitle}
-        ${content}
-      </div>
-    `;
+    return `<div class="a2ui-card">${title}${subtitle}${content}</div>`;
   }
 
   private renderList(component: A2UIComponent): string {
@@ -152,12 +175,7 @@ export class A2uiRendererService {
   private renderStatus(component: A2UIComponent): string {
     const status = component['status'] || 'info';
     const icon = this.getStatusIcon(status);
-    return `
-      <div class="a2ui-status a2ui-status-${status}">
-        <span class="material-icons">${icon}</span>
-        <span>${this.escapeHtml(component['message'])}</span>
-      </div>
-    `;
+    return `<div class="a2ui-status a2ui-status-${status}"><span class="material-icons">${icon}</span><span>${this.escapeHtml(component['message'])}</span></div>`;
   }
 
   private renderJson(component: A2UIComponent): string {

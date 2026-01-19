@@ -5,14 +5,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import com.google.adk.tools.BaseTool;
 import com.google.adk.tools.ToolContext;
 import com.google.genai.types.FunctionDeclaration;
 import com.google.genai.types.Schema;
 import com.google.genai.types.Type.Known;
-import com.hotel.booking.util.A2UIBuilder;
 
 import io.reactivex.rxjava3.core.Single;
 import lombok.extern.slf4j.Slf4j;
@@ -144,25 +142,39 @@ public class McpToolAdapter extends BaseTool {
 
                 if (result == null || result.containsKey("error")) {
                     log.error("MCP server error for tool '{}': {}", toolName, result);
-                    return A2UIBuilder.create()
-                            .addText("Error: Failed to execute " + toolName + " via MCP server", "body", "left")
-                            .build();
+                    Map<String, Object> errorResult = new HashMap<>();
+                    errorResult.put("error", "Failed to execute " + toolName);
+                    return errorResult;
                 }
 
                 log.info("*** MCP tool '{}' returned successfully", toolName);
 
-                // Format the result using A2UIBuilder for nice display
-                return A2UIBuilder.create()
-                        .addJsonTree(formatToolTitle(toolName), result, "both", false)
-                        .build();
+                // Return the raw result directly - the LLM will format it nicely
+                return result;
 
             } catch (Exception e) {
                 log.error("Error calling MCP tool '{}'", toolName, e);
-                return A2UIBuilder.create()
-                        .addText("Error: " + e.getMessage(), "body", "left")
-                        .build();
+                Map<String, Object> errorResult = new HashMap<>();
+                errorResult.put("error", e.getMessage());
+                return errorResult;
             }
         });
+    }
+
+    /**
+     * Format the MCP result as plain data for the LLM to process
+     * Returns the raw data so the LLM can generate a natural language response
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> formatResultAsData(Map<String, Object> result) {
+        // Return the raw result data - the LLM will format it nicely in natural
+        // language
+        // This ensures the user gets a conversational response, not raw JSON
+        Map<String, Object> response = new HashMap<>();
+        response.put("toolName", toolName);
+        response.put("data", result);
+        response.put("status", "success");
+        return response;
     }
 
     /**

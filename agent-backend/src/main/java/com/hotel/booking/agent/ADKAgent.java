@@ -1,5 +1,6 @@
 package com.hotel.booking.agent;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,6 +20,8 @@ import com.google.adk.tools.BaseTool;
 import com.google.genai.Client;
 import com.google.genai.types.Content;
 import com.google.genai.types.Part;
+import com.hotel.booking.a2a.A2AClient;
+import com.hotel.booking.a2a.A2AToolAdapter;
 import com.hotel.booking.mcp.McpClient;
 import com.hotel.booking.mcp.McpToolAdapter;
 import com.hotel.booking.model.AgentMessage;
@@ -31,6 +34,7 @@ import lombok.extern.slf4j.Slf4j;
  * Root agent implementation using Google ADK SDK.
  * Integrates with Gemini model via Vertex AI for intelligent hotel booking
  * assistance.
+ * Discovers tools from both MCP servers and A2A agents.
  */
 @Slf4j
 @Component
@@ -54,9 +58,11 @@ public class ADKAgent {
     private BaseAgent rooAgent;
 
     private final McpClient mcpClient;
+    private final A2AClient a2aClient;
 
-    public ADKAgent(McpClient mcpClient) {
+    public ADKAgent(McpClient mcpClient, A2AClient a2aClient) {
         this.mcpClient = mcpClient;
+        this.a2aClient = a2aClient;
     }
 
     @PostConstruct
@@ -66,15 +72,26 @@ public class ADKAgent {
     }
 
     /**
-     * Initialize the hotel booking agent with tools
+     * Initialize the hotel booking agent with tools from MCP and A2A sources
      */
     private void createAgent() {
         log.info("*** Creating agent: {} with model: {}, project: {}, location: {}", agentName, modelName, projectId,
                 location);
 
-        // Discover tools from MCP server dynamically
+        // Collect all tools from different sources
+        List<BaseTool> allTools = new ArrayList<>();
+
+        // Discover tools from MCP server (search, pricing)
         List<BaseTool> mcpTools = McpToolAdapter.discoverTools(mcpClient);
         log.info("*** Discovered {} tools from MCP server", mcpTools.size());
+        allTools.addAll(mcpTools);
+
+        // Discover tools from A2A agent (booking)
+        List<BaseTool> a2aTools = A2AToolAdapter.discoverTools(a2aClient);
+        log.info("*** Discovered {} tools from A2A agent", a2aTools.size());
+        allTools.addAll(a2aTools);
+
+        log.info("*** Total tools available: {}", allTools.size());
 
         BaseAgent agent = LlmAgent.builder()
                 .name(agentName)
@@ -84,29 +101,35 @@ public class ADKAgent {
                                 You are a helpful hotel booking assistant. Help users search for and book hotels.
 
                                 ⚠️ CRITICAL RULES - MUST FOLLOW ⚠️:
-                                1. When users ask to search for hotels, you MUST ALWAYS call the searchHotels tool FIRST
-                                2. When users ask for prices, you MUST ALWAYS call the getHotelPrice tool FIRST
-                                3. When users want to book, you MUST ALWAYS call the bookHotel tool FIRST
-                                4. NEVER EVER respond with text before calling the appropriate tool
+                                1. When users ask to search for hotels, you MUST call the searchHotels tool
+                                2. When users ask for prices, you MUST call the getHotelPrice tool
+                                3. When users want to book, you MUST call the bookHotel tool
+                                4. NEVER respond with text before calling the appropriate tool
                                 5. NEVER invent, make up, or create your own hotel data - ALWAYS use tools
                                 6. DO NOT return JSON manually - the tools return properly formatted data
-                                7. If a user asks "show hotels in [city]" or similar, your FIRST action is to call searchHotels, NOT to respond with text
 
-                                Tool Usage:
+                                ⛔ FORBIDDEN OUTPUT PATTERNS - NEVER DO THESE:
+                                - NEVER output tool calls as text like "searchHotels(destination='london')"
+                                - NEVER wrap tool calls in code blocks like ```tool_code ... ```
+                                - NEVER write function call syntax in your response
+                                - NEVER say "I'll call searchHotels" - just call it directly using function calling
+                                - If you want to call a tool, USE THE FUNCTION CALLING MECHANISM, not text output
+
+                                Tool Usage (use function calling, not text):
                                 - searchHotels: Search for hotels (required: destination, optional: minRating, maxPrice)
                                 - bookHotel: Book a room (required: hotelName, checkInDate, checkOutDate, guestName)
                                 - getHotelPrice: Get pricing (required: hotelName, numberOfNights)
 
-                                REMEMBER: Always call the tool FIRST, then respond based on the tool's output!
+                                REMEMBER: Use function calling to invoke tools. Never output tool syntax as text!
                                 """)
                 .model(new Gemini(modelName,
                         Client.builder()
                                 .vertexAI(true)
                                 .build()))
-                .tools(mcpTools)
+                .tools(allTools)
                 .build();
 
-        log.info("*** LlmAgent: [{}] built successfully with {} tools", agent.name(), mcpTools.size());
+        log.info("*** LlmAgent: [{}] built successfully with {} tools", agent.name(), allTools.size());
         this.rooAgent = agent;
     }
 
@@ -118,6 +141,10 @@ public class ADKAgent {
 
             log.info("*** Processing client message: [{}] with sessionId: [{}] {}", userMessage,
                     sessionState.getSessionId());
+
+            // Detect if user wants JSON tree display
+            final boolean userWantsJson = detectJsonRequest(userMessage);
+            log.info("*** User wants JSON tree display: {}", userWantsJson);
 
             // Add message to be sent to user to history
             AgentMessage userMsg = AgentMessage.builder()
@@ -158,13 +185,18 @@ public class ADKAgent {
             // Collect response text
             StringBuilder fullResponse = new StringBuilder();
 
-            // Detect if user explicitly requested JSON format
-            final boolean userRequestedJson = userMessage.toLowerCase()
-                    .matches(".*\\b(json|in json|as json|show.*json)\\b.*");
-            log.info("*** User requested JSON format: {}", userRequestedJson);
-
             // Flag to suppress text response when A2UI tree is sent
             final boolean[] suppressTextResponse = { false };
+
+            // Track if any response was sent to the frontend
+            final boolean[] responseSentToFrontend = { false };
+
+            // Store the last tool response for fallback if LLM fails
+            final Map<String, Object>[] lastToolResponse = new Map[] { null };
+            final String[] lastToolName = { null };
+
+            // Track if user wants JSON display
+            final boolean[] wantsJsonTree = { userWantsJson };
 
             // Run ADK agent using subscribe pattern
             log.info("*** Running agent asynchronously for user: {}, sessionId: {}", userId, sessionId);
@@ -195,33 +227,50 @@ public class ADKAgent {
                                             Map<String, Object> responseMap = funcResponse.response().get();
                                             log.info("  Debug: Tool response map: {}", responseMap);
 
-                                            // Check if tool wants A2UI sent directly
-                                            if (responseMap.containsKey("__a2ui_direct__") &&
+                                            // Store for fallback if LLM fails to generate response
+                                            lastToolResponse[0] = responseMap;
+                                            lastToolName[0] = funcResponse.name().orElse("tool");
+
+                                            // If user explicitly requested JSON tree, send it immediately
+                                            if (wantsJsonTree[0]) {
+                                                log.info(
+                                                        "*** User requested JSON tree - sending tool response as JSON tree");
+                                                Map<String, Object> a2uiJsonTree = com.hotel.booking.util.A2UIBuilder
+                                                        .create()
+                                                        .addHeading("📊 " + formatToolTitle(lastToolName[0]))
+                                                        .addJsonTree("Results", responseMap, "tree", false)
+                                                        .build();
+                                                ObjectMapper mapper = new ObjectMapper();
+                                                String a2uiJson = mapper.writeValueAsString(a2uiJsonTree);
+                                                log.info("*** Sending JSON tree to frontend: {}", a2uiJson);
+                                                messageConsumer.accept(a2uiJson);
+                                                hasSpecificPart = true;
+                                                responseSentToFrontend[0] = true;
+                                                suppressTextResponse[0] = true;
+                                            }
+                                            // Check if tool wants A2UI sent directly (e.g., JSON tree display)
+                                            else if (responseMap.containsKey("__a2ui_direct__") &&
                                                     Boolean.TRUE.equals(responseMap.get("__a2ui_direct__"))) {
 
-                                                // Only send A2UI if user explicitly requested JSON format
-                                                if (userRequestedJson) {
-                                                    // Remove the marker
-                                                    Map<String, Object> a2uiData = new HashMap<>(responseMap);
-                                                    a2uiData.remove("__a2ui_direct__");
+                                                // Always send A2UI with __a2ui_direct__ to frontend
+                                                // Remove the marker before sending
+                                                Map<String, Object> a2uiData = new HashMap<>(responseMap);
+                                                a2uiData.remove("__a2ui_direct__");
 
-                                                    ObjectMapper mapper = new ObjectMapper();
-                                                    String a2uiJson = mapper.writeValueAsString(a2uiData);
-                                                    log.info("*** Sending JSON tree A2UI to frontend: {}", a2uiJson);
-                                                    messageConsumer.accept(a2uiJson);
-                                                    hasSpecificPart = true;
+                                                ObjectMapper mapper = new ObjectMapper();
+                                                String a2uiJson = mapper.writeValueAsString(a2uiData);
+                                                log.info("*** Sending A2UI (direct) to frontend: {}", a2uiJson);
+                                                messageConsumer.accept(a2uiJson);
+                                                hasSpecificPart = true;
+                                                responseSentToFrontend[0] = true;
 
-                                                    // Suppress subsequent text response from LLM
-                                                    suppressTextResponse[0] = true;
-                                                    log.info(
-                                                            "*** Suppressing LLM text response since A2UI tree was sent");
-                                                } else {
-                                                    log.info(
-                                                            "*** User did not request JSON - letting LLM format the response naturally");
-                                                }
+                                                // Suppress subsequent text response from LLM
+                                                suppressTextResponse[0] = true;
+                                                log.info(
+                                                        "*** Suppressing LLM text response since A2UI was sent directly");
                                             }
-                                            // Check if this is A2UI formatted response (legacy path)
-                                            else if (responseMap.containsKey("a2ui")
+                                            // Check if this is A2UI formatted response (has format=a2ui and components)
+                                            else if ("a2ui".equals(responseMap.get("format"))
                                                     && responseMap.containsKey("components")) {
                                                 // Convert to JSON and send to frontend
                                                 ObjectMapper mapper = new ObjectMapper();
@@ -231,6 +280,7 @@ public class ADKAgent {
                                                         a2uiJson);
                                                 messageConsumer.accept(a2uiJson);
                                                 hasSpecificPart = true;
+                                                responseSentToFrontend[0] = true;
                                             }
                                         } catch (Exception e) {
                                             log.error("Error processing function response", e);
@@ -239,6 +289,15 @@ public class ADKAgent {
                                 } else if (part.text().isPresent() && !part.text().get().trim().isEmpty()) {
                                     String text = part.text().get().trim();
                                     log.info("*** Text response from LLM: [{}]", text);
+
+                                    // Filter out tool call syntax that LLM might output as text
+                                    if (isToolCallSyntax(text)) {
+                                        log.warn("*** Detected tool call syntax in text output, suppressing: [{}]",
+                                                text);
+                                        // Don't send this to the frontend - it's a malformed response
+                                        continue;
+                                    }
+
                                     fullResponse.append(text);
 
                                     // Only send text if we haven't already sent A2UI tree
@@ -251,10 +310,12 @@ public class ADKAgent {
                                             String a2uiJson = mapper.writeValueAsString(a2uiResponse);
                                             log.info("*** Wrapped text in A2UI format: {}", a2uiJson);
                                             messageConsumer.accept(a2uiJson);
+                                            responseSentToFrontend[0] = true;
                                         } catch (Exception e) {
                                             log.error("Error wrapping text in A2UI", e);
                                             // Fallback to plain text
                                             messageConsumer.accept(text);
+                                            responseSentToFrontend[0] = true;
                                         }
                                     } else {
                                         log.info("*** Skipping LLM text response - A2UI tree already sent");
@@ -306,6 +367,34 @@ public class ADKAgent {
                             sessionState.addMessage(agentMsg);
                             log.info("*** Agent processing completed. Response length: {} chars",
                                     responseText.length());
+                        } else if (responseSentToFrontend[0]) {
+                            // Response was already sent (e.g., A2UI data from tool)
+                            log.info("*** Agent processing completed. Response was sent directly to frontend.");
+                        } else if (lastToolResponse[0] != null) {
+                            // LLM failed but we have tool data - format it as proper A2UI components
+                            log.warn("*** LLM failed to respond, using tool data as fallback with A2UI components");
+                            try {
+                                Map<String, Object> a2uiResponse = formatToolResponseAsA2UI(lastToolName[0],
+                                        lastToolResponse[0]);
+                                ObjectMapper mapper = new ObjectMapper();
+                                String a2uiJson = mapper.writeValueAsString(a2uiResponse);
+                                log.info("*** Sending A2UI fallback response: {}", a2uiJson);
+                                messageConsumer.accept(a2uiJson);
+                            } catch (Exception e) {
+                                log.error("Error formatting fallback tool response as A2UI", e);
+                                // Fallback to text format
+                                try {
+                                    String fallbackText = formatToolResponseAsText(lastToolName[0],
+                                            lastToolResponse[0]);
+                                    Map<String, Object> a2uiText = com.hotel.booking.util.A2UIBuilder
+                                            .wrapText(fallbackText);
+                                    ObjectMapper mapper = new ObjectMapper();
+                                    String a2uiJson = mapper.writeValueAsString(a2uiText);
+                                    messageConsumer.accept(a2uiJson);
+                                } catch (Exception ex) {
+                                    log.error("Error with text fallback", ex);
+                                }
+                            }
                         } else {
                             log.warn("*** Agent completed but no response text was generated");
                             String errorMsg = "I apologize, but the AI agent did not generate a response. " +
@@ -347,5 +436,232 @@ public class ADKAgent {
         }
 
         return future;
+    }
+
+    /**
+     * Detect if the LLM output contains tool call syntax instead of using function
+     * calling.
+     * This catches cases where the model outputs text like:
+     * - ```tool_code\nsearchHotels(destination="london")```
+     * - searchHotels(destination="london") at the start of the response
+     */
+    private boolean isToolCallSyntax(String text) {
+        if (text == null || text.isEmpty()) {
+            return false;
+        }
+
+        // Check for code block with tool_code marker - this is always a malformed
+        // response
+        if (text.contains("```tool_code")) {
+            return true;
+        }
+
+        // Check if the ENTIRE response is just a tool call (not mentioned within text)
+        // Only match if the text starts with a tool name followed immediately by (
+        String trimmed = text.trim();
+        String[] toolNames = { "searchHotels", "bookHotel", "getHotelPrice" };
+        for (String toolName : toolNames) {
+            // Match if line starts with: toolName( or toolName (
+            if (trimmed.matches("^" + toolName + "\\s*\\(.*")) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Format tool response data as A2UI components when LLM fails to respond.
+     * This is a fallback to ensure users see properly formatted UI components.
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> formatToolResponseAsA2UI(String toolName, Map<String, Object> response) {
+        com.hotel.booking.util.A2UIBuilder builder = com.hotel.booking.util.A2UIBuilder.create();
+
+        if ("searchHotels".equals(toolName)) {
+            // Format hotel search results using A2UI components
+            String destination = (String) response.get("destination");
+            List<Map<String, Object>> hotels = (List<Map<String, Object>>) response.get("hotels");
+
+            builder.addHeading("🏨 Hotels in " + capitalize(destination));
+            builder.addDivider();
+
+            if (hotels != null && !hotels.isEmpty()) {
+                for (int i = 0; i < hotels.size(); i++) {
+                    Map<String, Object> hotel = hotels.get(i);
+                    String hotelName = (String) hotel.get("name");
+                    Object rating = hotel.get("rating");
+                    Object price = hotel.get("pricePerNight");
+                    String description = (String) hotel.get("description");
+
+                    // Create a card for each hotel
+                    String content = "⭐ Rating: " + rating + "/5\n" +
+                            "💰 Price: $" + price + " per night\n" +
+                            "📍 " + description;
+
+                    builder.addCard(hotelName, "Hotel #" + (i + 1), content);
+                }
+
+                builder.addDivider();
+                builder.addBody("Would you like me to get pricing details or book any of these hotels?");
+            } else {
+                builder.addStatus("No hotels found for this destination.", "warning");
+            }
+        } else if ("getHotelPrice".equals(toolName)) {
+            // Format pricing response using A2UI components
+            String hotelName = (String) response.get("hotelName");
+            Object totalCost = response.get("totalCost");
+            Object nights = response.get("numberOfNights");
+            Object pricePerNight = response.get("pricePerNight");
+
+            builder.addHeading("💰 Pricing for " + hotelName);
+            builder.addDivider();
+
+            String pricingInfo = "**Price per night:** $" + pricePerNight + "\n" +
+                    "**Number of nights:** " + nights + "\n" +
+                    "**Total cost:** $" + totalCost;
+            builder.addBody(pricingInfo);
+
+            builder.addDivider();
+            builder.addBody("Would you like me to book this hotel?");
+
+        } else if ("bookHotel".equals(toolName)) {
+            // Format booking confirmation using A2UI components
+            Boolean success = (Boolean) response.get("success");
+            String bookingId = (String) response.get("bookingId");
+            String message = (String) response.get("message");
+
+            if (Boolean.TRUE.equals(success)) {
+                builder.addStatus("Booking Confirmed!", "success");
+                builder.addDivider();
+
+                String bookingDetails = "**Booking ID:** " + bookingId + "\n\n" + message;
+                builder.addBody(bookingDetails);
+
+                builder.addStatus("Your reservation has been successfully created.", "info");
+            } else {
+                builder.addStatus("Booking Failed", "error");
+                builder.addBody(message != null ? message : "An error occurred while processing your booking.");
+            }
+        } else {
+            // Generic formatting for unknown tools - show as JSON tree
+            builder.addHeading("📋 Results from " + toolName);
+            builder.addJsonTree("Tool Response", response, "tree", false);
+        }
+
+        return builder.build();
+    }
+
+    /**
+     * Legacy method - format as plain text (kept for backward compatibility)
+     */
+    @SuppressWarnings("unchecked")
+    private String formatToolResponseAsText(String toolName, Map<String, Object> response) {
+        StringBuilder sb = new StringBuilder();
+
+        if ("searchHotels".equals(toolName)) {
+            // Format hotel search results
+            String destination = (String) response.get("destination");
+            List<Map<String, Object>> hotels = (List<Map<String, Object>>) response.get("hotels");
+
+            sb.append("Here are the hotels I found in ").append(destination).append(":\n\n");
+
+            if (hotels != null && !hotels.isEmpty()) {
+                for (int i = 0; i < hotels.size(); i++) {
+                    Map<String, Object> hotel = hotels.get(i);
+                    sb.append("**").append(i + 1).append(". ").append(hotel.get("name")).append("**\n");
+                    sb.append("   ⭐ Rating: ").append(hotel.get("rating")).append("/5\n");
+                    sb.append("   💰 Price: $").append(hotel.get("pricePerNight")).append(" per night\n");
+                    sb.append("   📍 ").append(hotel.get("description")).append("\n\n");
+                }
+                sb.append("Would you like me to get pricing details or book any of these hotels?");
+            } else {
+                sb.append("No hotels found for this destination.");
+            }
+        } else if ("getHotelPrice".equals(toolName)) {
+            // Format pricing response
+            String hotelName = (String) response.get("hotelName");
+            Object totalCost = response.get("totalCost");
+            Object nights = response.get("numberOfNights");
+
+            sb.append("**Pricing for ").append(hotelName).append("**\n\n");
+            sb.append("Total cost for ").append(nights).append(" night(s): **$").append(totalCost).append("**\n\n");
+            sb.append("Would you like me to book this hotel?");
+        } else if ("bookHotel".equals(toolName)) {
+            // Format booking confirmation
+            Boolean success = (Boolean) response.get("success");
+            String bookingId = (String) response.get("bookingId");
+            String message = (String) response.get("message");
+
+            if (Boolean.TRUE.equals(success)) {
+                sb.append("✅ **Booking Confirmed!**\n\n");
+                sb.append("Booking ID: ").append(bookingId).append("\n");
+                sb.append(message);
+            } else {
+                sb.append("❌ Booking failed: ").append(message);
+            }
+        } else {
+            // Generic formatting for unknown tools
+            sb.append("Here are the results:\n\n");
+            try {
+                ObjectMapper mapper = new ObjectMapper();
+                sb.append(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(response));
+            } catch (Exception e) {
+                sb.append(response.toString());
+            }
+        }
+
+        return sb.toString();
+    }
+
+    private String capitalize(String str) {
+        if (str == null || str.isEmpty()) {
+            return str;
+        }
+        return str.substring(0, 1).toUpperCase() + str.substring(1).toLowerCase();
+    }
+
+    /**
+     * Detect if user is requesting JSON/tree display format.
+     * Matches phrases like "show in json", "as json", "json tree", "in json
+     * format", etc.
+     */
+    private boolean detectJsonRequest(String userMessage) {
+        if (userMessage == null) {
+            return false;
+        }
+        String lower = userMessage.toLowerCase();
+        return lower.contains("show in json") ||
+                lower.contains("as json") ||
+                lower.contains("in json") ||
+                lower.contains("json tree") ||
+                lower.contains("json format") ||
+                lower.contains("show json") ||
+                lower.contains("display json") ||
+                lower.contains("raw json") ||
+                lower.contains("show as tree") ||
+                lower.contains("tree view");
+    }
+
+    /**
+     * Format tool name into a display title (e.g., "searchHotels" -> "Search Hotels
+     * Results")
+     */
+    private String formatToolTitle(String name) {
+        if (name == null || name.isEmpty()) {
+            return "Results";
+        }
+        StringBuilder title = new StringBuilder();
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (i == 0) {
+                title.append(Character.toUpperCase(c));
+            } else if (Character.isUpperCase(c)) {
+                title.append(' ').append(c);
+            } else {
+                title.append(c);
+            }
+        }
+        return title.toString() + " Results";
     }
 }

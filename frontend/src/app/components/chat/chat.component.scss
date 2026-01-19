@@ -269,27 +269,26 @@
 /* A2UI Component Styles */
 .a2ui-container {
   width: 100%;
-  margin: 8px 0;
 }
 
 .a2ui-heading {
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   font-weight: 600;
-  margin: 12px 0 8px 0;
+  margin: 0 0 4px 0;
   color: inherit;
 }
 
 .a2ui-subheading {
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   font-weight: 500;
-  margin: 10px 0 6px 0;
+  margin: 0 0 4px 0;
   color: inherit;
 }
 
 .a2ui-body {
   font-size: 1rem;
-  line-height: 1.6;
-  margin: 8px 0;
+  line-height: 1.5;
+  margin: 4px 0;
 }
 
 .a2ui-caption {
@@ -301,8 +300,8 @@
 .a2ui-card {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 8px;
-  padding: 16px;
-  margin: 12px 0;
+  padding: 12px 16px;
+  margin: 8px 0;
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
@@ -316,20 +315,31 @@
 }
 
 .a2ui-card-title {
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   font-weight: 600;
-  margin: 0 0 8px 0;
+  margin: 0 0 4px 0;
 }
 
 .a2ui-card-subtitle {
-  font-size: 0.9rem;
-  opacity: 0.8;
-  margin: 0 0 12px 0;
+  font-size: 0.85rem;
+  opacity: 0.7;
+  margin: 0 0 8px 0;
 }
 
 .a2ui-card-content {
-  white-space: pre-wrap;
-  line-height: 1.6;
+  line-height: 1.5;
+  
+  p {
+    margin: 4px 0;
+  }
+  
+  p:first-child {
+    margin-top: 0;
+  }
+  
+  p:last-child {
+    margin-bottom: 0;
+  }
 }
 
 .a2ui-list {
@@ -345,7 +355,7 @@
 .a2ui-divider {
   border: none;
   border-top: 1px solid rgba(255, 255, 255, 0.2);
-  margin: 12px 0;
+  margin: 8px 0;
 }
 
 .agent-message .a2ui-divider {
@@ -481,6 +491,80 @@
 .agent-message .a2ui-textfield-input {
   background: rgba(255, 255, 255, 0.95);
   border-color: rgba(0, 0, 0, 0.15);
+}
+
+// Text component with markdown support
+.a2ui-text {
+  line-height: 1.7;
+  word-wrap: break-word;
+  
+  // Headers
+  h1, h2, h3, h4, h5, h6 {
+    margin: 12px 0 8px 0;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+  
+  h1 { font-size: 1.5rem; }
+  h2 { font-size: 1.3rem; }
+  h3 { font-size: 1.15rem; }
+  h4, h5, h6 { font-size: 1rem; }
+  
+  // Paragraphs
+  p {
+    margin: 8px 0;
+    line-height: 1.7;
+  }
+  
+  // Bold and Italic
+  strong {
+    font-weight: 700;
+  }
+  
+  em {
+    font-style: italic;
+  }
+  
+  // Lists
+  ul, ol {
+    margin: 8px 0;
+    padding-left: 20px;
+    
+    li {
+      margin: 4px 0;
+      line-height: 1.6;
+    }
+  }
+  
+  // Inline code
+  code {
+    background: rgba(0, 0, 0, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    font-family: 'Fira Code', monospace;
+  }
+  
+  // Horizontal rule
+  hr {
+    border: none;
+    border-top: 1px solid rgba(0, 0, 0, 0.15);
+    margin: 16px 0;
+  }
+}
+
+.a2ui-heading {
+  font-weight: 600;
+  margin: 8px 0;
+}
+
+.a2ui-body {
+  font-size: 1rem;
+}
+
+.a2ui-caption {
+  font-size: 0.85rem;
+  opacity: 0.8;
 }
 
 // Image component

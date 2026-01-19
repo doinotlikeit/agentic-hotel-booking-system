@@ -1,4 +1,4 @@
-package com.hotel.mcp.model;
+package com.hotel.a2a.model;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

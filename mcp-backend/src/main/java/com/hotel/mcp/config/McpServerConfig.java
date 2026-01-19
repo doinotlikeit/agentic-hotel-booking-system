@@ -5,13 +5,15 @@ import org.springframework.ai.tool.method.MethodToolCallbackProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import com.hotel.mcp.tools.BookingTools;
 import com.hotel.mcp.tools.HotelTools;
 import com.hotel.mcp.tools.PricingTools;
 
 /**
  * Configuration for Spring AI MCP Server.
  * Registers all tool providers for MCP protocol exposure.
+ * 
+ * Note: BookingTools has been moved to a2a-booking-backend
+ * and is now exposed via A2A protocol instead of MCP.
  */
 @Configuration
 public class McpServerConfig {
@@ -33,16 +35,6 @@ public class McpServerConfig {
     public ToolCallbackProvider pricingToolsProvider(PricingTools pricingTools) {
         return MethodToolCallbackProvider.builder()
                 .toolObjects(pricingTools)
-                .build();
-    }
-
-    /**
-     * Register booking tools as MCP tool callbacks
-     */
-    @Bean
-    public ToolCallbackProvider bookingToolsProvider(BookingTools bookingTools) {
-        return MethodToolCallbackProvider.builder()
-                .toolObjects(bookingTools)
                 .build();
     }
 }

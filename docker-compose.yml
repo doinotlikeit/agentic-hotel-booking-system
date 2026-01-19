@@ -13,10 +13,13 @@ services:
       - GCP_LOCATION=${GCP_LOCATION:-us-central1}
       - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials.json
       - MCP_SERVER_URL=http://mcp-backend:8081
+      - A2A_BOOKING_URL=http://a2a-booking-backend:8082
     volumes:
       - ${GOOGLE_APPLICATION_CREDENTIALS}:/app/credentials.json:ro
     depends_on:
       mcp-backend:
+        condition: service_healthy
+      a2a-booking-backend:
         condition: service_healthy
     networks:
       - hotel-booking-network
@@ -44,6 +47,23 @@ services:
       retries: 3
       start_period: 40s
 
+  a2a-booking-backend:
+    build:
+      context: ./a2a-booking-backend
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+    networks:
+      - hotel-booking-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
   frontend:
     build:
       context: ./frontend
@@ -53,6 +73,7 @@ services:
     depends_on:
       - agent-backend
       - mcp-backend
+      - a2a-booking-backend
     networks:
       - hotel-booking-network
 
