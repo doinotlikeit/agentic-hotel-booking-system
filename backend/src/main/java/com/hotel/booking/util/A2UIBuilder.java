@@ -7,17 +7,17 @@ import java.util.*;
  * All agent responses should be formatted using A2UI components
  */
 public class A2UIBuilder {
-    
+
     private final List<Map<String, Object>> components;
-    
+
     private A2UIBuilder() {
         this.components = new ArrayList<>();
     }
-    
+
     public static A2UIBuilder create() {
         return new A2UIBuilder();
     }
-    
+
     /**
      * Add a Card component
      */
@@ -32,7 +32,7 @@ public class A2UIBuilder {
         components.add(card);
         return this;
     }
-    
+
     /**
      * Add a Text component
      */
@@ -45,35 +45,45 @@ public class A2UIBuilder {
         components.add(text);
         return this;
     }
-    
+
     /**
      * Add a heading text
      */
     public A2UIBuilder addHeading(String content) {
         return addText(content, "heading", "left");
     }
-    
+
+    /**
+     * Wrap plain text in A2UI format (for LLM responses)
+     * This ensures all content is delivered in A2UI format
+     */
+    public static Map<String, Object> wrapText(String text) {
+        return create()
+                .addText(text, "body", "left")
+                .build();
+    }
+
     /**
      * Add a subheading text
      */
     public A2UIBuilder addSubheading(String content) {
         return addText(content, "subheading", "left");
     }
-    
+
     /**
      * Add body text
      */
     public A2UIBuilder addBody(String content) {
         return addText(content, "body", "left");
     }
-    
+
     /**
      * Add caption text
      */
     public A2UIBuilder addCaption(String content) {
         return addText(content, "caption", "left");
     }
-    
+
     /**
      * Add a Grid component
      */
@@ -85,7 +95,7 @@ public class A2UIBuilder {
         components.add(grid);
         return this;
     }
-    
+
     /**
      * Add a Button component
      */
@@ -98,7 +108,7 @@ public class A2UIBuilder {
         components.add(button);
         return this;
     }
-    
+
     /**
      * Add a list component
      */
@@ -110,7 +120,7 @@ public class A2UIBuilder {
         components.add(list);
         return this;
     }
-    
+
     /**
      * Add a divider
      */
@@ -120,7 +130,7 @@ public class A2UIBuilder {
         components.add(divider);
         return this;
     }
-    
+
     /**
      * Add raw JSON data display
      */
@@ -132,7 +142,89 @@ public class A2UIBuilder {
         components.add(jsonDisplay);
         return this;
     }
-    
+
+    /**
+     * Add JSON with tree view (expandable/collapsible)
+     * 
+     * @param label     Optional label for the JSON display
+     * @param data      The JSON data to display
+     * @param mode      Display mode: "raw", "tree", or "both"
+     * @param collapsed Whether tree nodes should start collapsed (default true)
+     */
+    public A2UIBuilder addJsonTree(String label, Object data, String mode, boolean collapsed) {
+        Map<String, Object> jsonDisplay = new HashMap<>();
+        jsonDisplay.put("type", "json");
+        if (label != null) {
+            jsonDisplay.put("label", label);
+        }
+        jsonDisplay.put("data", data);
+        jsonDisplay.put("mode", mode != null ? mode : "both"); // raw, tree, or both
+        jsonDisplay.put("collapsed", collapsed);
+        components.add(jsonDisplay);
+        return this;
+    }
+
+    /**
+     * Add JSON with tree view (collapsed by default, showing both modes)
+     */
+    public A2UIBuilder addJsonTree(String label, Object data) {
+        return addJsonTree(label, data, "both", true);
+    }
+
+    /**
+     * Add a table component with pagination
+     * 
+     * @param headers    Column headers
+     * @param rows       Table rows (each row is a list of cell values)
+     * @param pageSize   Number of rows per page (default 10)
+     * @param sortable   Enable column sorting (default true)
+     * @param filterable Enable table filtering (default false)
+     * @param pagination Enable pagination (default true if rows > pageSize)
+     */
+    public A2UIBuilder addTable(List<String> headers, List<List<Object>> rows,
+            Integer pageSize, Boolean sortable,
+            Boolean filterable, Boolean pagination) {
+        Map<String, Object> table = new HashMap<>();
+        table.put("type", "table");
+        table.put("headers", headers);
+        table.put("rows", rows);
+        if (pageSize != null) {
+            table.put("pageSize", pageSize);
+        }
+        if (sortable != null) {
+            table.put("sortable", sortable);
+        }
+        if (filterable != null) {
+            table.put("filterable", filterable);
+        }
+        if (pagination != null) {
+            table.put("pagination", pagination);
+        }
+        components.add(table);
+        return this;
+    }
+
+    /**
+     * Add a simple table with default settings (10 rows per page, sortable)
+     */
+    public A2UIBuilder addTable(List<String> headers, List<List<Object>> rows) {
+        return addTable(headers, rows, 10, true, false, null);
+    }
+
+    /**
+     * Add a table with custom page size
+     */
+    public A2UIBuilder addTable(List<String> headers, List<List<Object>> rows, int pageSize) {
+        return addTable(headers, rows, pageSize, true, false, null);
+    }
+
+    /**
+     * Add a searchable/filterable table
+     */
+    public A2UIBuilder addFilterableTable(List<String> headers, List<List<Object>> rows, int pageSize) {
+        return addTable(headers, rows, pageSize, true, true, null);
+    }
+
     /**
      * Add a status message with icon
      */
@@ -144,7 +236,7 @@ public class A2UIBuilder {
         components.add(statusMsg);
         return this;
     }
-    
+
     /**
      * Build the final A2UI metadata structure
      */
@@ -155,7 +247,7 @@ public class A2UIBuilder {
         metadata.put("components", components);
         return metadata;
     }
-    
+
     /**
      * Build and convert to JSON string
      */

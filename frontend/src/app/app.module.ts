@@ -13,6 +13,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatTreeModule } from '@angular/material/tree';
 
 // Components
 import { AppComponent } from './app.component';
@@ -21,6 +22,7 @@ import { A2uCardComponent } from './components/a2u/a2u-card.component';
 import { A2uTextComponent } from './components/a2u/a2u-text.component';
 import { A2uGridComponent } from './components/a2u/a2u-grid.component';
 import { A2uButtonComponent } from './components/a2u/a2u-button.component';
+import { A2uJsonTreeComponent } from './components/a2u/a2u-json-tree.component';
 
 // Services
 import { WebSocketService } from './services/websocket.service';
@@ -33,7 +35,8 @@ import { AgUiService } from './services/ag-ui.service';
     A2uCardComponent,
     A2uTextComponent,
     A2uGridComponent,
-    A2uButtonComponent
+    A2uButtonComponent,
+    A2uJsonTreeComponent
   ],
   imports: [
     BrowserModule,
@@ -47,7 +50,8 @@ import { AgUiService } from './services/ag-ui.service';
     MatFormFieldModule,
     MatChipsModule,
     MatDividerModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    MatTreeModule
   ],
   providers: [
     WebSocketService,

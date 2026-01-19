@@ -1,9 +1,11 @@
 import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { WebSocketService, ConnectionStatus } from '../../services/websocket.service';
 import { AgUiService, AgentMessage } from '../../services/ag-ui.service';
 import { A2uiRendererService } from '../../services/a2ui-renderer.service';
 import { MarkdownService } from '../../services/markdown.service';
 import { Subscription } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-chat',
@@ -20,14 +22,22 @@ export class ChatComponent implements OnInit, OnDestroy {
   messageHistory: string[] = [];
   historyIndex: number = -1;
   
+  // Cache for rendered A2UI content to prevent re-rendering on every change detection
+  private a2uiRenderCache = new Map<string, SafeHtml>();
+  
+  // Generic, configurable properties
+  appTitle: string = environment.appTitle || 'AI Agent';
+  emptyStateHint: string = environment.emptyStateHint || 'Type your message to begin...';
+  
   private subscriptions: Subscription[] = [];
-  private readonly WS_URL = 'ws://localhost:8080/agent';
+  private readonly WS_URL = environment.wsUrl || 'ws://localhost:8080/agent';
 
   constructor(
     private wsService: WebSocketService,
     private agUiService: AgUiService,
     private a2uiRenderer: A2uiRendererService,
-    private markdownService: MarkdownService
+    private markdownService: MarkdownService,
+    private sanitizer: DomSanitizer
   ) {}
 
   ngOnInit(): void {
@@ -142,14 +152,32 @@ export class ChatComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Render A2UI content to HTML
+   * Get A2UI components from message
    */
-  renderA2UIContent(message: AgentMessage): string {
+  getA2UIComponents(message: AgentMessage): any[] {
     const metadata = this.a2uiRenderer.extractA2UIMetadata(message);
-    if (metadata) {
-      return this.a2uiRenderer.renderToHTML(metadata);
-    }
-    return message.content;
+    return metadata?.components || [];
+  }
+
+  /**
+   * Format JSON data for display
+   */
+  formatJson(data: any): string {
+    return JSON.stringify(data, null, 2);
+  }
+
+  /**
+   * Render a single non-JSON A2UI component to HTML
+   */
+  renderSingleComponent(component: any): SafeHtml {
+    // Create a temporary metadata object with just this component
+    const tempMetadata = {
+      format: 'a2ui',
+      version: '1.0',
+      components: [component]
+    };
+    const html = this.a2uiRenderer.renderToHTML(tempMetadata);
+    return this.sanitizer.bypassSecurityTrustHtml(html);
   }
 
   /**

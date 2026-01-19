@@ -41,7 +41,9 @@ export class WebSocketService {
 
       this.socket.onmessage = (event) => {
         try {
+          console.log('🔵 WebSocket RAW message received:', event.data);
           const data = JSON.parse(event.data);
+          console.log('🔵 Parsed message type:', data.type, 'messageId:', data.message?.messageId);
 
           // Handle pong messages
           if (data.type === 'pong') {

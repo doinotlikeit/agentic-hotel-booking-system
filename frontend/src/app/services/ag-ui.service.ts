@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { WebSocketService } from './websocket.service';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { v4 as uuidv4 } from 'uuid';
+import { environment } from '../../environments/environment';
 
 export interface AgentMessage {
   sessionId: string;
@@ -11,6 +12,7 @@ export interface AgentMessage {
   timestamp: string;
   content: string;
   type: 'user' | 'agent';
+  data?: any; // A2UI metadata or other structured data
 }
 
 export interface AgentEvent {
@@ -25,7 +27,7 @@ export interface AgentEvent {
   providedIn: 'root'
 })
 export class AgUiService {
-  private readonly APP_ID = 'hotel-booking-app';
+  private readonly APP_ID = environment.appId || 'generic-agent-app';
   private readonly USER_ID = 'user-' + uuidv4().substring(0, 8);
   private sessionId: string = '';
   
@@ -108,6 +110,12 @@ export class AgUiService {
   }
 
   private handleChat(data: any): void {
+    console.log('=== handleChat called ===');
+    console.log('Full data object:', JSON.stringify(data, null, 2));
+    console.log('data.message:', data.message);
+    console.log('data.message.data:', data.message?.data);
+    console.log('data.message.messageId:', data.message?.messageId);
+    
     if (data.message) {
       const agentMessage: AgentMessage = {
         sessionId: data.message.sessionId || this.sessionId,
@@ -120,9 +128,14 @@ export class AgUiService {
       };
 
       // Preserve A2UI metadata if present
-      if (data.data) {
-        (agentMessage as any).data = data.data;
+      if (data.message.data) {
+        agentMessage.data = data.message.data;
+        console.log('✅ A2UI metadata attached:', agentMessage.data);
+      } else {
+        console.log('❌ No A2UI metadata found');
       }
+
+      console.log('Final agentMessage:', agentMessage);
 
       const currentMessages = this.messagesSubject.value;
       this.messagesSubject.next([...currentMessages, agentMessage]);

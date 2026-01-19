@@ -9,6 +9,7 @@ import com.google.adk.tools.ToolContext;
 import com.google.genai.types.FunctionDeclaration;
 import com.google.genai.types.Schema;
 import com.google.genai.types.Type.Known;
+import com.hotel.booking.util.A2UIBuilder;
 
 import io.reactivex.rxjava3.core.Single;
 import lombok.extern.slf4j.Slf4j;
@@ -60,7 +61,7 @@ public class GetHotelPriceTool extends BaseTool {
                 double tax = subtotal * 0.12;
                 double total = subtotal + tax;
 
-                return Map.of(
+                Map<String, Object> priceInfo = Map.of(
                         "success", true,
                         "hotelName", hotelName,
                         "numberOfNights", numberOfNights,
@@ -69,9 +70,15 @@ public class GetHotelPriceTool extends BaseTool {
                         "tax", tax,
                         "total", total);
 
+                return A2UIBuilder.create()
+                        .addJsonTree("Price Details", priceInfo, "both", false)
+                        .build();
+
             } catch (Exception e) {
                 log.error("Error getting hotel price", e);
-                return Map.of("success", false, "error", e.getMessage());
+                return A2UIBuilder.create()
+                        .addText("Error: " + e.getMessage(), "body", "left")
+                        .build();
             }
         });
     }

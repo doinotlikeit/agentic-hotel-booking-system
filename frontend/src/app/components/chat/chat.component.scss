@@ -269,6 +269,7 @@
 /* A2UI Component Styles */
 .a2ui-container {
   width: 100%;
+  margin: 8px 0;
 }
 
 .a2ui-heading {
@@ -440,6 +441,313 @@
 
 .a2ui-grid-item {
   padding: 8px;
+}
+
+/* New A2UI Components - Generic and Domain-Agnostic */
+
+// TextField/Input component
+.a2ui-textfield {
+  margin: 12px 0;
+}
+
+.a2ui-textfield-label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: inherit;
+}
+
+.a2ui-textfield-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  font-size: 0.95rem;
+  background: rgba(255, 255, 255, 0.9);
+  transition: all 0.2s ease;
+  
+  &:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+  
+  &:disabled {
+    background: rgba(0, 0, 0, 0.05);
+    cursor: not-allowed;
+  }
+}
+
+.agent-message .a2ui-textfield-input {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(0, 0, 0, 0.15);
+}
+
+// Image component
+.a2ui-image {
+  margin: 12px 0;
+  text-align: center;
+}
+
+.a2ui-image-img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.a2ui-image-caption {
+  margin-top: 8px;
+  font-size: 0.875rem;
+  color: rgba(0, 0, 0, 0.6);
+  font-style: italic;
+}
+
+// Table component
+.a2ui-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  
+  thead {
+    background: rgba(0, 0, 0, 0.05);
+  }
+  
+  th {
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid rgba(0, 0, 0, 0.1);
+    color: inherit;
+  }
+  
+  td {
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  }
+  
+  tbody tr {
+    transition: background 0.2s ease;
+    
+    &:hover {
+      background: rgba(0, 0, 0, 0.02);
+    }
+    
+    &:last-child td {
+      border-bottom: none;
+    }
+  }
+}
+
+.agent-message .a2ui-table {
+  background: rgba(255, 255, 255, 0.95);
+}
+
+// Advanced JSON Component with Tree View
+.a2ui-json {
+  margin: 12px 0;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.agent-message .a2ui-json {
+  background: #f8f9fa;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.a2ui-json-label {
+  font-weight: 600;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.05);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  color: #1f2937;
+}
+
+.a2ui-json-tree-wrapper {
+  background: #ffffff;
+}
+
+.a2ui-json-mode-label {
+  font-weight: 500;
+  font-size: 0.875rem;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.03);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.a2ui-json-raw {
+  .a2ui-json-content {
+    background: rgba(0, 0, 0, 0.03);
+    padding: 12px;
+    margin: 0;
+    overflow-x: auto;
+    font-family: 'Courier New', Consolas, monospace;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: #1f2937;
+  }
+}
+
+// Advanced Table Component with Pagination
+.a2ui-table-container {
+  margin: 12px 0;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.a2ui-table-filter {
+  position: relative;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.02);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  
+  .filter-input {
+    width: 100%;
+    padding: 8px 36px 8px 12px;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+    
+    &:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+  }
+  
+  .filter-icon {
+    position: absolute;
+    right: 24px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    opacity: 0.5;
+  }
+}
+
+.a2ui-table {
+  width: 100%;
+  border-collapse: collapse;
+  
+  &.sortable th {
+    cursor: pointer;
+    user-select: none;
+    
+    &:hover {
+      background: rgba(0, 0, 0, 0.08);
+    }
+    
+    &.asc .sort-icon::after {
+      content: ' ▲';
+      color: #3b82f6;
+    }
+    
+    &.desc .sort-icon::after {
+      content: ' ▼';
+      color: #3b82f6;
+    }
+  }
+  
+  thead {
+    background: rgba(0, 0, 0, 0.05);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  
+  th {
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid rgba(0, 0, 0, 0.1);
+    color: inherit;
+    white-space: nowrap;
+    
+    .sort-icon {
+      margin-left: 6px;
+      opacity: 0.4;
+      font-size: 0.75rem;
+    }
+  }
+  
+  td {
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  }
+  
+  tbody tr {
+    transition: background 0.2s ease;
+    
+    &:hover {
+      background: rgba(59, 130, 246, 0.05);
+    }
+    
+    &:last-child td {
+      border-bottom: none;
+    }
+  }
+}
+
+.a2ui-table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.02);
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  
+  .page-btn {
+    padding: 6px 12px;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    background: white;
+    color: #374151;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    
+    &:hover:not(:disabled) {
+      background: #3b82f6;
+      color: white;
+      border-color: #3b82f6;
+    }
+    
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+  }
+  
+  .page-info {
+    padding: 0 12px;
+    font-size: 0.875rem;
+    color: #6b7280;
+    
+    .current-page {
+      font-weight: 600;
+      color: #3b82f6;
+    }
+  }
+}
+
+.a2ui-table-info {
+  padding: 8px 12px;
+  text-align: center;
+  font-size: 0.875rem;
+  color: #6b7280;
+  background: rgba(0, 0, 0, 0.02);
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 /* Markdown Content Styles */

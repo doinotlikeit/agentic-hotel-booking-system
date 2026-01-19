@@ -118,20 +118,95 @@ public class WebSocketHandler extends TextWebSocketHandler {
 
     private void sendMessage(WebSocketSession session, String message) throws IOException {
         if (session.isOpen()) {
+            log.info("=== sendMessage called ===");
+            log.info("Raw message: {}", message);
+
             Map<String, Object> messageData = new HashMap<>();
             messageData.put("sessionId", session.getId());
-            messageData.put("content", message);
             messageData.put("type", "agent");
             messageData.put("timestamp", java.time.Instant.now().toString());
             messageData.put("messageId", java.util.UUID.randomUUID().toString());
+
+            // Try to parse message as JSON to check if it contains A2UI metadata
+            // First, check if the message is wrapped in markdown code blocks
+            String jsonContent = message;
+            if (message.trim().startsWith("```json") || message.trim().startsWith("```")) {
+                // Extract JSON from markdown code block
+                String cleaned = message.replaceAll("^```json\\s*", "").replaceAll("^```\\s*", "");
+                cleaned = cleaned.replaceAll("```\\s*$", "");
+                jsonContent = cleaned.trim();
+                log.info("Extracted JSON from markdown code block");
+            }
+
+            try {
+                JsonNode jsonNode = objectMapper.readTree(jsonContent);
+                log.info("Parsed JSON node: {}", jsonNode);
+                log.info("Has 'a2ui' key: {}", jsonNode.has("a2ui"));
+                log.info("Has 'components' key: {}", jsonNode.has("components"));
+                log.info("Has 'format' key: {}", jsonNode.has("format"));
+
+                boolean hasA2UIMetadata = false;
+                Map<String, Object> dataObject = new HashMap<>();
+
+                // Priority 1: Check for LLM-wrapped format: {"a2ui": {...}, "components":
+                // [...]}
+                // The LLM often wraps and adds root-level components array
+                if (jsonNode.has("a2ui")) {
+                    JsonNode a2uiNode = jsonNode.get("a2ui");
+
+                    // Use root-level components if they exist, otherwise check inside a2ui node
+                    JsonNode componentsNode = null;
+                    if (jsonNode.has("components") && jsonNode.get("components").isArray()) {
+                        componentsNode = jsonNode.get("components");
+                        log.info("✅ Found components at root level");
+                    } else if (a2uiNode.has("components")) {
+                        componentsNode = a2uiNode.get("components");
+                        log.info("✅ Found components inside a2ui node");
+                    } else if (a2uiNode.has("elements")) {
+                        componentsNode = a2uiNode.get("elements");
+                        log.info("✅ Found elements inside a2ui node (converting to components)");
+                    }
+
+                    if (componentsNode != null) {
+                        dataObject.put("format", "a2ui");
+                        dataObject.put("components", objectMapper.convertValue(componentsNode, Object.class));
+                        hasA2UIMetadata = true;
+                        log.info("✅ Detected LLM-wrapped A2UI format");
+                    }
+                }
+                // Priority 2: Check for direct A2UI format: {"format": "a2ui", "components":
+                // [...]}
+                else if (jsonNode.has("format") && "a2ui".equals(jsonNode.get("format").asText())
+                        && jsonNode.has("components")) {
+                    dataObject.put("format", "a2ui");
+                    dataObject.put("components", objectMapper.convertValue(jsonNode.get("components"), Object.class));
+                    hasA2UIMetadata = true;
+                    log.info("✅ Detected direct A2UI format");
+                }
+
+                if (hasA2UIMetadata) {
+                    messageData.put("content", ""); // Empty content since A2UI will render
+                    messageData.put("data", dataObject);
+                    log.info("Data object sent to frontend: {}", dataObject);
+                } else {
+                    // Regular text message
+                    messageData.put("content", message);
+                    log.info("Regular text message");
+                }
+            } catch (Exception e) {
+                // Not valid JSON or doesn't contain A2UI - treat as regular text
+                messageData.put("content", message);
+                log.info("Not JSON or parse error, treating as text: {}", e.getMessage());
+            }
 
             Map<String, Object> response = new HashMap<>();
             response.put("type", "chat");
             response.put("message", messageData);
 
             String json = objectMapper.writeValueAsString(response);
+            log.info("Sending to frontend: {}", json);
             session.sendMessage(new TextMessage(json));
-            log.info("*** Sent message: [{}] to UI, sessionId: {}", message, session.getId());
+            log.info("*** Message sent to UI, sessionId: {}", session.getId());
         } else {
             log.warn("Cannot send message to UI - WebSocket session is closed");
         }

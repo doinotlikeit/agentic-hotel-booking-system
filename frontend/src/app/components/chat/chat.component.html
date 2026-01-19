@@ -2,8 +2,8 @@
   <!-- Header -->
   <div class="chat-header">
     <div class="header-left">
-      <mat-icon class="app-icon">hotel</mat-icon>
-      <span class="app-title">Hotel Booking System</span>
+      <mat-icon class="app-icon">smart_toy</mat-icon>
+      <span class="app-title">{{ appTitle }}</span>
     </div>
     <div class="header-right">
       <mat-chip
@@ -37,7 +37,7 @@
     <div *ngIf="messages.length === 0" class="empty-state">
       <mat-icon class="empty-icon">chat_bubble_outline</mat-icon>
       <p class="empty-text">Start a conversation with the agent</p>
-      <p class="empty-subtext">Try asking: "Search for hotels in Paris"</p>
+      <p class="empty-subtext">{{ emptyStateHint }}</p>
     </div>
 
     <div
@@ -59,12 +59,36 @@
           }}</span>
         </div>
         <div class="message-content">
-          <!-- Render A2UI metadata if available -->
-          <div
-            *ngIf="hasA2UIContent(message)"
-            [innerHTML]="renderA2UIContent(message)"
-            class="a2ui-container"
-          ></div>
+          <!-- Render A2UI with Angular components -->
+          <div *ngIf="hasA2UIContent(message)" class="a2ui-container">
+            <ng-container *ngFor="let component of getA2UIComponents(message)">
+              <!-- JSON Tree Component -->
+              <div *ngIf="component.type === 'json'" class="a2ui-json">
+                <div class="a2ui-json-label" *ngIf="component.label">
+                  {{ component.label }}
+                </div>
+
+                <!-- Tree View using Angular Material (always use tree when available) -->
+                <div
+                  class="a2ui-json-tree-wrapper"
+                  *ngIf="component.mode === 'tree' || component.mode === 'both'"
+                >
+                  <app-a2u-json-tree
+                    [data]="component.data"
+                    [collapsed]="component.collapsed !== false"
+                  >
+                  </app-a2u-json-tree>
+                </div>
+              </div>
+
+              <!-- Other A2UI components rendered as HTML -->
+              <div
+                *ngIf="component.type !== 'json'"
+                [innerHTML]="renderSingleComponent(component)"
+              ></div>
+            </ng-container>
+          </div>
+
           <!-- Render markdown content if no A2UI metadata -->
           <div
             *ngIf="!hasA2UIContent(message)"
@@ -86,7 +110,7 @@
           #messageInput
           [(ngModel)]="currentMessage"
           (keydown)="onKeyDown($event)"
-          placeholder="Ask about hotels, destinations, or bookings"
+          placeholder="Type your message here..."
           rows="2"
           [disabled]="connectionStatus !== 'Connected'"
         >
