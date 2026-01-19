@@ -1,13 +1,10 @@
 package com.hotel.booking.agent;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -18,16 +15,14 @@ import com.google.adk.agents.LlmAgent;
 import com.google.adk.models.Gemini;
 import com.google.adk.runner.Runner;
 import com.google.adk.sessions.InMemorySessionService;
-import com.google.adk.tools.Annotations.Schema;
+import com.google.adk.tools.BaseTool;
 import com.google.genai.Client;
 import com.google.genai.types.Content;
 import com.google.genai.types.Part;
+import com.hotel.booking.mcp.McpClient;
+import com.hotel.booking.mcp.McpToolAdapter;
 import com.hotel.booking.model.AgentMessage;
 import com.hotel.booking.model.AgentSessionState;
-import com.hotel.booking.model.Hotel;
-import com.hotel.booking.tools.BookHotelTool;
-import com.hotel.booking.tools.GetHotelPriceTool;
-import com.hotel.booking.tools.SearchHotelsTool;
 
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
@@ -58,7 +53,10 @@ public class ADKAgent {
 
     private BaseAgent rooAgent;
 
-    public ADKAgent() {
+    private final McpClient mcpClient;
+
+    public ADKAgent(McpClient mcpClient) {
+        this.mcpClient = mcpClient;
     }
 
     @PostConstruct
@@ -73,6 +71,11 @@ public class ADKAgent {
     private void createAgent() {
         log.info("*** Creating agent: {} with model: {}, project: {}, location: {}", agentName, modelName, projectId,
                 location);
+
+        // Discover tools from MCP server dynamically
+        List<BaseTool> mcpTools = McpToolAdapter.discoverTools(mcpClient);
+        log.info("*** Discovered {} tools from MCP server", mcpTools.size());
+
         BaseAgent agent = LlmAgent.builder()
                 .name(agentName)
                 .description(agentDescription)
@@ -100,13 +103,10 @@ public class ADKAgent {
                         Client.builder()
                                 .vertexAI(true)
                                 .build()))
-                .tools(List.of(
-                        new SearchHotelsTool(),
-                        new BookHotelTool(),
-                        new GetHotelPriceTool()))
+                .tools(mcpTools)
                 .build();
 
-        log.info("*** LlmAgent: [{}] built successfully with {} tools", agent.name(), 3);
+        log.info("*** LlmAgent: [{}] built successfully with {} tools", agent.name(), mcpTools.size());
         this.rooAgent = agent;
     }
 
@@ -347,164 +347,5 @@ public class ADKAgent {
         }
 
         return future;
-    }
-
-    // ============= Tool Methods =============
-
-    /**
-     * Search for hotels in a specific destination
-     */
-    @Schema(description = "Search for hotels in a specific destination. Returns a list of available hotels with details.")
-    public static Map<String, Object> searchHotels(
-            @Schema(name = "destination", description = "The city or destination to search for hotels") String destination,
-            @Schema(name = "minRating", description = "Minimum star rating (1-5), optional") Double minRating,
-            @Schema(name = "maxPrice", description = "Maximum price per night in USD, optional") Double maxPrice) {
-
-        try {
-            log.info("Searching hotels in {} (minRating: {}, maxPrice: {})", destination, minRating, maxPrice);
-
-            List<Hotel> hotels = getHotelsByDestination(destination);
-
-            // Apply filters
-            if (minRating != null) {
-                final double minRatingFinal = minRating;
-                hotels = hotels.stream()
-                        .filter(h -> h.getRating() >= minRatingFinal)
-                        .collect(Collectors.toList());
-            }
-
-            if (maxPrice != null) {
-                final double maxPriceFinal = maxPrice;
-                hotels = hotels.stream()
-                        .filter(h -> h.getPricePerNight() <= maxPriceFinal)
-                        .collect(Collectors.toList());
-            }
-
-            return Map.of(
-                    "success", true,
-                    "destination", destination,
-                    "hotelCount", hotels.size(),
-                    "hotels", hotels);
-
-        } catch (Exception e) {
-            log.error("Error searching hotels", e);
-            return Map.of("success", false, "error", e.getMessage());
-        }
-    }
-
-    /**
-     * Book a hotel room
-     */
-    @Schema(description = "Book a hotel room. Returns a booking confirmation with booking ID and details.")
-    public static Map<String, Object> bookHotel(
-            @Schema(name = "hotelName", description = "Name of the hotel to book") String hotelName,
-            @Schema(name = "checkInDate", description = "Check-in date in YYYY-MM-DD format") String checkInDate,
-            @Schema(name = "checkOutDate", description = "Check-out date in YYYY-MM-DD format") String checkOutDate,
-            @Schema(name = "guestName", description = "Name of the guest") String guestName,
-            @Schema(name = "numberOfGuests", description = "Number of guests, default 1") Integer numberOfGuests) {
-
-        try {
-            int guests = numberOfGuests != null ? numberOfGuests : 1;
-
-            log.info("Booking hotel {} for {} from {} to {}", hotelName, guestName, checkInDate, checkOutDate);
-
-            String bookingId = "BK-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
-
-            return Map.of(
-                    "success", true,
-                    "bookingId", bookingId,
-                    "hotelName", hotelName,
-                    "guestName", guestName,
-                    "numberOfGuests", guests,
-                    "checkInDate", checkInDate,
-                    "checkOutDate", checkOutDate,
-                    "message", "✅ Booking confirmed! Confirmation email sent.");
-
-        } catch (Exception e) {
-            log.error("Error booking hotel", e);
-            return Map.of("success", false, "error", e.getMessage());
-        }
-    }
-
-    /**
-     * Get detailed pricing information for a hotel
-     */
-    @Schema(description = "Get detailed pricing information for a specific hotel including per night rates, taxes, and total costs.")
-    public static Map<String, Object> getHotelPrice(
-            @Schema(name = "hotelName", description = "Name of the hotel") String hotelName,
-            @Schema(name = "numberOfNights", description = "Number of nights to stay") Integer numberOfNights) {
-
-        try {
-            log.info("Getting price for {} for {} nights", hotelName, numberOfNights);
-
-            double baseRate = calculateBaseRate(hotelName);
-            double subtotal = baseRate * numberOfNights;
-            double tax = subtotal * 0.12;
-            double total = subtotal + tax;
-
-            return Map.of(
-                    "success", true,
-                    "hotelName", hotelName,
-                    "numberOfNights", numberOfNights,
-                    "baseRate", baseRate,
-                    "subtotal", subtotal,
-                    "tax", tax,
-                    "total", total);
-
-        } catch (Exception e) {
-            log.error("Error getting hotel price", e);
-            return Map.of("success", false, "error", e.getMessage());
-        }
-    }
-
-    // ============= Helper Methods =============
-
-    private static List<Hotel> getHotelsByDestination(String destination) {
-        List<Hotel> hotels = new ArrayList<>();
-
-        if (destination.toLowerCase().contains("paris")) {
-            hotels.add(new Hotel("Grand Hotel Paris", "Paris", "H001", 4.5, 250.0, "Luxury hotel near the Louvre"));
-            hotels.add(
-                    new Hotel("Eiffel View Hotel", "Paris", "H002", 4.0, 180.0, "Stunning views of the Eiffel Tower"));
-            hotels.add(new Hotel("Luxury Suites Paris", "Paris", "H003", 5.0, 450.0,
-                    "Premium suites in the heart of Paris"));
-        } else if (destination.toLowerCase().contains("london")) {
-            hotels.add(new Hotel("Westminster Palace", "London", "H004", 4.8, 320.0, "Historic hotel near Parliament"));
-            hotels.add(new Hotel("Thames River Hotel", "London", "H005", 4.2, 210.0,
-                    "Riverside hotel with modern amenities"));
-            hotels.add(new Hotel("Buckingham Suites", "London", "H006", 4.6, 380.0,
-                    "Elegant suites near royal landmarks"));
-        } else if (destination.toLowerCase().contains("new york")) {
-            hotels.add(
-                    new Hotel("Manhattan Grand", "New York", "H007", 4.7, 400.0, "Iconic hotel in midtown Manhattan"));
-            hotels.add(new Hotel("Brooklyn Boutique", "New York", "H008", 4.3, 280.0,
-                    "Trendy boutique hotel in Brooklyn"));
-            hotels.add(
-                    new Hotel("Times Square Hotel", "New York", "H009", 4.5, 350.0, "Prime location in Times Square"));
-        } else {
-            hotels.add(new Hotel("City Center Hotel", destination, "H010", 4.0, 150.0, "Modern hotel in city center"));
-            hotels.add(new Hotel("Comfort Inn", destination, "H011", 3.5, 100.0,
-                    "Affordable and comfortable accommodation"));
-            hotels.add(new Hotel("Luxury Resort", destination, "H012", 4.8, 300.0,
-                    "Premium resort with excellent facilities"));
-        }
-
-        return hotels;
-    }
-
-    private static double calculateBaseRate(String hotelName) {
-        String lower = hotelName.toLowerCase();
-
-        if (lower.contains("luxury") || lower.contains("grand")) {
-            return 400.0;
-        } else if (lower.contains("boutique") || lower.contains("suites")) {
-            return 280.0;
-        } else if (lower.contains("comfort") || lower.contains("inn")) {
-            return 120.0;
-        } else if (lower.contains("resort")) {
-            return 350.0;
-        } else {
-            return 200.0;
-        }
     }
 }

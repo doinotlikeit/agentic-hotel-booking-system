@@ -245,6 +245,14 @@ public class A2UIBuilder {
         metadata.put("format", "a2ui");
         metadata.put("version", "1.0");
         metadata.put("components", components);
+
+        // Check if any component is a JSON tree - if so, mark for direct send to UI
+        boolean hasJsonTree = components.stream()
+                .anyMatch(c -> "json".equals(c.get("type")));
+        if (hasJsonTree) {
+            metadata.put("__a2ui_direct__", true);
+        }
+
         return metadata;
     }
 

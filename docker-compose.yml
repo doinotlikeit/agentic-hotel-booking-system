@@ -1,9 +1,9 @@
-version: '3.8'
+version: "3.8"
 
 services:
-  backend:
+  agent-backend:
     build:
-      context: ./backend
+      context: ./agent-backend
       dockerfile: Dockerfile
     ports:
       - "8080:8080"
@@ -12,12 +12,33 @@ services:
       - GCP_PROJECT_ID=${GCP_PROJECT_ID}
       - GCP_LOCATION=${GCP_LOCATION:-us-central1}
       - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials.json
+      - MCP_SERVER_URL=http://mcp-backend:8081
     volumes:
       - ${GOOGLE_APPLICATION_CREDENTIALS}:/app/credentials.json:ro
+    depends_on:
+      mcp-backend:
+        condition: service_healthy
     networks:
       - hotel-booking-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  mcp-backend:
+    build:
+      context: ./mcp-backend
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+    networks:
+      - hotel-booking-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -30,7 +51,8 @@ services:
     ports:
       - "4200:80"
     depends_on:
-      - backend
+      - agent-backend
+      - mcp-backend
     networks:
       - hotel-booking-network
 

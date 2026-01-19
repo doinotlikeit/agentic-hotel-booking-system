@@ -14,7 +14,7 @@ A full-stack AI-powered hotel booking system with Angular frontend and Spring Bo
   - AG-UI protocol implementation for agent communication
   - A2U (Agent-to-UI) components for rich interactions
 
-### Backend (Spring Boot)
+### Agent Backend (Spring Boot)
 - **Framework**: Spring Boot 3.2 with WebSocket support
 - **Agent Architecture**: Google Cloud ADK (Agentic Development Kit) v0.5.0
   - **ADKAgent**: Main agent implementation with LlmAgent
@@ -43,7 +43,7 @@ A full-stack AI-powered hotel booking system with Angular frontend and Spring Bo
 - WebSocket for real-time communication
 - TypeScript
 
-### Backend
+### Agent Backend
 - Spring Boot 3.2
 - Spring WebSocket
 - Spring Boot DevTools & Actuator
@@ -77,7 +77,7 @@ hotel-booking-system/
 │   ├── angular.json
 │   └── tailwind.config.js
 │
-└── backend/
+└── agent-backend/
     ├── src/main/java/com/hotel/booking/
     │   ├── agent/
     │   │   └── ADKAgent.java              # Main agent implementation
@@ -130,11 +130,11 @@ npm start
 
 The application will be available at `http://localhost:4200`
 
-### Backend Setup
+### Agent Backend Setup
 
-1. Navigate to the backend directory:
+1. Navigate to the agent-backend directory:
 ```bash
-cd backend
+cd agent-backend
 ```
 
 2. **Configure environment variables (REQUIRED for ADK)**:
@@ -157,7 +157,7 @@ mvn clean install
 mvn spring-boot:run
 ```
 
-The backend will be available at `http://localhost:8080`
+The agent backend will be available at `http://localhost:8080`
 
 **Note**: The application uses Google Cloud ADK which requires:
 - Valid GCP project with VertexAI API enabled
@@ -257,9 +257,9 @@ npm run build       # Production build
 npm run watch       # Watch mode
 ```
 
-### Backend Development
+### Agent Backend Development
 ```bash
-cd backend
+cd agent-backend
 mvn spring-boot:run           # Run with auto-reload
 mvn clean test                # Run tests
 mvn spring-boot:build-image   # Build Docker image
@@ -328,8 +328,8 @@ mvn spring-boot:build-image   # Build Docker image
 ### Frontend Issues
 
 **WebSocket won't connect**
-- Check backend is running on port 8080
-- Verify CORS settings in backend
+- Check agent backend is running on port 8080
+- Verify CORS settings in agent backend
 - Check browser console for errors
 
 **Messages not appearing**
@@ -337,7 +337,7 @@ mvn spring-boot:build-image   # Build Docker image
 - Verify message format matches protocol
 - Check browser console for errors
 
-### Backend Issues
+### Agent Backend Issues
 
 **Port already in use**
 ```bash

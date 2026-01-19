@@ -2,7 +2,7 @@
 
 ## Current Status: ✅ WORKING
 
-The backend now has a **fully functional Google ADK integration** with proper tool implementation and Gemini AI model integration.
+The agent backend now has a **fully functional Google ADK integration** with proper tool implementation and Gemini AI model integration.
 
 ## Implementation Overview
 

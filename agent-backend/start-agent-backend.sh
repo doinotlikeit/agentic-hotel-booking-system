@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# Hotel Booking Backend Startup Script
-# This script starts the backend with proper Google Cloud configuration
+# Hotel Booking Agent Backend Startup Script
+# This script starts the agent backend with proper Google Cloud configuration
 
 echo "=========================================="
-echo "Hotel Booking Backend Startup"
+echo "Hotel Booking Agent Backend Startup"
 echo "=========================================="
 echo ""
 
@@ -39,9 +39,9 @@ echo "  Project: $GOOGLE_CLOUD_PROJECT"
 echo "  Location: $GOOGLE_CLOUD_LOCATION"
 echo "  Credentials: $GOOGLE_APPLICATION_CREDENTIALS"
 echo ""
-echo "Starting backend..."
+echo "Starting agent backend..."
 echo "=========================================="
 echo ""
 
-# Start the backend
+# Start the agent backend
 mvn spring-boot:run

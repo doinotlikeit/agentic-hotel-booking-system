@@ -27,14 +27,21 @@ Thumbs.db
 *.sublime-workspace
 *.sublime-project
 
-# Backend (Java/Maven)
-backend/target/
-backend/.mvn/
-backend/mvnw
-backend/mvnw.cmd
+# Agent Backend (Java/Maven)
+agent-backend/target/
+agent-backend/.mvn/
+agent-backend/mvnw
+agent-backend/mvnw.cmd
 *.class
 *.jar
-!backend/.mvn/wrapper/maven-wrapper.jar
+!agent-backend/.mvn/wrapper/maven-wrapper.jar
+
+# MCP Backend (Java/Maven)
+mcp-backend/target/
+mcp-backend/.mvn/
+mcp-backend/mvnw
+mcp-backend/mvnw.cmd
+!mcp-backend/.mvn/wrapper/maven-wrapper.jar
 *.war
 *.ear
 *.zip
