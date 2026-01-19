@@ -44,7 +44,7 @@ export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
 
 ### 3. Configure Application Properties
 
-Edit `backend/src/main/resources/application.properties`:
+Edit `adk-root-agent/src/main/resources/application.properties`:
 
 ```properties
 # Google Cloud Configuration
@@ -67,9 +67,9 @@ export GCP_LOCATION=us-central1
 
 ## Option 1: Local Development
 
-### Start Backend
+### Start ADK Root Agent
 ```bash
-cd backend
+cd adk-root-agent
 
 # Set environment variables (REQUIRED)
 export GCP_PROJECT_ID=your-project-id
@@ -79,9 +79,9 @@ export GCP_LOCATION=us-central1
 mvn spring-boot:run
 ```
 
-### Start Frontend (in new terminal)
+### Start Angular Frontend (in new terminal)
 ```bash
-cd frontend
+cd angular-frontend
 npm install
 npm start
 ```
@@ -147,7 +147,7 @@ Open browser to: http://localhost:4200
 
 ## Troubleshooting
 
-### Backend Not Starting
+### Agent Backend Not Starting
 ```bash
 # Check if port 8080 is already in use
 lsof -i :8080
@@ -170,15 +170,15 @@ npm install
 ```
 
 ### WebSocket Connection Issues
-1. Ensure backend is running
+1. Ensure agent backend is running
 2. Check browser console for errors
 3. Verify CORS settings allow localhost:4200
 4. Try refreshing the page
 
 ## Configuration
 
-### Backend Configuration
-Edit: `backend/src/main/resources/application.properties`
+### ADK Root Agent Configuration
+Edit: `adk-root-agent/src/main/resources/application.properties`
 
 ```properties
 # Change port
@@ -196,8 +196,8 @@ adk.max-tokens=2048
 
 **Important**: `GCP_PROJECT_ID` must be set as an environment variable. The ADK SDK uses this to initialize VertexAI.
 
-### Frontend Configuration
-Edit: `frontend/src/environments/environment.ts`
+### Angular Frontend Configuration
+Edit: `angular-frontend/src/environments/environment.ts`
 
 ```typescript
 export const environment = {
@@ -209,7 +209,7 @@ export const environment = {
 
 ## Health Checks
 
-### Backend Health
+### Agent Backend Health
 ```bash
 curl http://localhost:8080/actuator/health
 ```
@@ -222,8 +222,8 @@ wscat -c ws://localhost:8080/agent
 
 ## Next Steps
 
-1. Customize the UI colors in `frontend/src/styles.scss`
-2. Add more agent tools in the backend
+1. Customize the UI colors in `angular-frontend/src/styles.scss`
+2. Add more agent tools in the adk-root-agent
 3. Integrate with real MCP servers
 4. Add authentication
 5. Implement database persistence
@@ -231,6 +231,6 @@ wscat -c ws://localhost:8080/agent
 ## Getting Help
 
 - Check the logs in the terminal where you started each service
-- Backend logs show agent processing and events
+- Agent backend logs show agent processing and events
 - Frontend browser console shows WebSocket messages
 - Review the main README.md for detailed documentation

@@ -27,14 +27,21 @@ Thumbs.db
 *.sublime-workspace
 *.sublime-project
 
-# Backend (Java/Maven)
-backend/target/
-backend/.mvn/
-backend/mvnw
-backend/mvnw.cmd
+# ADK Root Agent (Java/Maven)
+adk-root-agent/target/
+adk-root-agent/.mvn/
+adk-root-agent/mvnw
+adk-root-agent/mvnw.cmd
 *.class
 *.jar
-!backend/.mvn/wrapper/maven-wrapper.jar
+!adk-root-agent/.mvn/wrapper/maven-wrapper.jar
+
+# MCP Hotel Tools (Java/Maven)
+mcp-hotel-tools/target/
+mcp-hotel-tools/.mvn/
+mcp-hotel-tools/mvnw
+mcp-hotel-tools/mvnw.cmd
+!mcp-hotel-tools/.mvn/wrapper/maven-wrapper.jar
 *.war
 *.ear
 *.zip
@@ -42,21 +49,21 @@ backend/mvnw.cmd
 *.rar
 hs_err_pid*
 
-# Frontend (Angular/Node)
-frontend/node_modules/
-frontend/dist/
-frontend/.angular/
-frontend/.sass-cache/
-frontend/connect.lock
-frontend/coverage/
-frontend/libpeerconnection.log
-frontend/npm-debug.log
-frontend/yarn-error.log
-frontend/testem.log
-frontend/typings/
-frontend/.npm
-frontend/.eslintcache
-frontend/.stylelintcache
+# Angular Frontend (Angular/Node)
+angular-frontend/node_modules/
+angular-frontend/dist/
+angular-frontend/.angular/
+angular-frontend/.sass-cache/
+angular-frontend/connect.lock
+angular-frontend/coverage/
+angular-frontend/libpeerconnection.log
+angular-frontend/npm-debug.log
+angular-frontend/yarn-error.log
+angular-frontend/testem.log
+angular-frontend/typings/
+angular-frontend/.npm
+angular-frontend/.eslintcache
+angular-frontend/.stylelintcache
 
 # Logs
 logs
