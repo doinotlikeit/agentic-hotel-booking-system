@@ -258,26 +258,44 @@ runner.runAsync(userId, adkSession.id(), userContent).subscribe(
 - ✅ **WebSocket Support** - Bidirectional real-time communication
 - ✅ **Error Handling** - Graceful error recovery
 - ✅ **Reactive Streams** - Async event processing with RxJava3
+- ✅ **MCP Tool Integration** - Tools discovered from MCP servers
+- ✅ **A2A Agent Integration** - Skills discovered from A2A booking and SerpAPI agents
+- ✅ **Dynamic Tool Discovery** - Background polling for tool availability
+- ✅ **A2UI Response Formatting** - Rich UI components with cards and image galleries
+- ✅ **Direct Tool Response Rendering** - Immediate display of searchHotelsLive results with images
 
 ### 🔧 Tool Capabilities
 
-1. **search_hotels** - Find hotels with filters
+**MCP Tools (Port 8081):**
+1. **searchHotels** - Find hotels with filters (mock data)
    - Destination search
    - Rating filters (1-5 stars)
    - Price range filtering
    - Detailed hotel information
 
-2. **book_hotel** - Make reservations
+2. **getHotelPrice** - Price calculations
+   - Per-night rates
+   - Multi-night totals
+   - Tax calculations (12%)
+   - Total cost breakdown
+
+**A2A Booking Agent (Port 8082):**
+3. **book-hotel** - Make reservations
    - Guest information
    - Date selection
    - Booking confirmation with ID
    - Multi-guest support
 
-3. **get_hotel_price** - Price calculations
-   - Per-night rates
-   - Multi-night totals
-   - Tax calculations (12%)
-   - Total cost breakdown
+**A2A SerpAPI Agent (Port 8083) - Optional:**
+4. **searchHotelsLive** - Real-time hotel search
+   - Live pricing from Google Hotels
+   - Hotel images and photos
+   - Reviews and ratings
+   - Location and amenities
+   - **Direct A2UI rendering** - Results displayed immediately with image galleries
+
+5. **getHotelDetails** - Detailed property information
+   - Full hotel details via property token
 
 ## Usage Example
 
@@ -382,9 +400,7 @@ Monitor agent events:
 
 ### Planned Features
 
-- [ ] **MCP Integration** - Remote tool calling via Model Context Protocol
 - [ ] **Persistent Sessions** - Database-backed session storage
-- [ ] **Multi-Agent System** - Specialized agents for different tasks
 - [ ] **Tool Confirmation** - User approval for sensitive operations
 - [ ] **RAG Integration** - Vector search for hotel information
 - [ ] **Analytics** - Conversation metrics and insights
@@ -392,7 +408,6 @@ Monitor agent events:
 ### Tool Roadmap
 
 - [ ] `cancel_booking` - Reservation cancellation
-- [ ] `get_hotel_details` - Detailed property information
 - [ ] `check_availability` - Real-time availability checking
 - [ ] `apply_discount` - Promotional code handling
 - [ ] `get_reviews` - Customer review aggregation

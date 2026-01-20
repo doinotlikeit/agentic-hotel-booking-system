@@ -110,6 +110,60 @@ public class A2UIBuilder {
     }
 
     /**
+     * Add an Image component
+     */
+    public A2UIBuilder addImage(String src, String alt, String caption, Integer width, Integer height) {
+        Map<String, Object> image = new HashMap<>();
+        image.put("type", "image");
+        image.put("src", src);
+        if (alt != null) {
+            image.put("alt", alt);
+        }
+        if (caption != null) {
+            image.put("caption", caption);
+        }
+        if (width != null) {
+            image.put("width", width);
+        }
+        if (height != null) {
+            image.put("height", height);
+        }
+        components.add(image);
+        return this;
+    }
+
+    /**
+     * Add an Image Gallery component (grid of images)
+     */
+    public A2UIBuilder addImageGallery(List<String> imageUrls, String alt, Integer maxImages, Integer columns) {
+        Map<String, Object> gallery = new HashMap<>();
+        gallery.put("type", "image-gallery");
+        gallery.put("images", imageUrls);
+        if (alt != null) {
+            gallery.put("alt", alt);
+        }
+        if (maxImages != null) {
+            gallery.put("maxImages", maxImages);
+        } else {
+            gallery.put("maxImages", 6); // Default
+        }
+        if (columns != null) {
+            gallery.put("columns", columns);
+        } else {
+            gallery.put("columns", 3); // Default
+        }
+        components.add(gallery);
+        return this;
+    }
+
+    /**
+     * Add an Image Gallery component with just images (using defaults)
+     */
+    public A2UIBuilder addImageGallery(List<String> imageUrls) {
+        return addImageGallery(imageUrls, null, null, null);
+    }
+
+    /**
      * Add a list component
      */
     public A2UIBuilder addList(List<String> items, boolean ordered) {

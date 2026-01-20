@@ -39,39 +39,62 @@ public class ToolDiscoveryService {
     @Value("${tool.discovery.initial.delay.seconds:5}")
     private int initialDelaySeconds;
 
-    private final McpClient mcpClient;
-    private final A2AClient a2aClient;
+    @Value("${a2a.booking.enabled:true}")
+    private boolean bookingAgentEnabled;
 
-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
+    @Value("${a2a.serpapi.enabled:false}")
+    private boolean serpapiAgentEnabled;
+
+    @Value("${a2a.serpapi.url:http://localhost:8083}")
+    private String serpapiAgentUrl;
+
+    private final McpClient mcpClient;
+    private final A2AClient a2aBookingClient;
+    private A2AClient a2aSerpapiClient;
+
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(3);
 
     // Thread-safe lists for discovered tools
     @Getter
     private final CopyOnWriteArrayList<BaseTool> mcpTools = new CopyOnWriteArrayList<>();
     @Getter
     private final CopyOnWriteArrayList<BaseTool> a2aTools = new CopyOnWriteArrayList<>();
+    @Getter
+    private final CopyOnWriteArrayList<BaseTool> serpapiTools = new CopyOnWriteArrayList<>();
 
     // Status flags
     private final AtomicBoolean mcpDiscovered = new AtomicBoolean(false);
     private final AtomicBoolean a2aDiscovered = new AtomicBoolean(false);
+    private final AtomicBoolean serpapiDiscovered = new AtomicBoolean(false);
 
     // Error messages for user feedback
     @Getter
     private volatile String mcpErrorMessage = null;
     @Getter
     private volatile String a2aErrorMessage = null;
+    @Getter
+    private volatile String serpapiErrorMessage = null;
 
     // Listeners for tool discovery events
     private final List<ToolDiscoveryListener> listeners = new CopyOnWriteArrayList<>();
 
     public ToolDiscoveryService(McpClient mcpClient, A2AClient a2aClient) {
         this.mcpClient = mcpClient;
-        this.a2aClient = a2aClient;
+        this.a2aBookingClient = a2aClient;
     }
 
     @PostConstruct
     public void init() {
         log.info("*** Starting Tool Discovery Service - polling every {}s after {}s initial delay",
                 pollIntervalSeconds, initialDelaySeconds);
+        log.info("*** A2A Booking Agent enabled: {}", bookingAgentEnabled);
+        log.info("*** A2A SerpAPI Agent enabled: {}", serpapiAgentEnabled);
+
+        // Initialize SerpAPI client if enabled
+        if (serpapiAgentEnabled) {
+            this.a2aSerpapiClient = new A2AClient(serpapiAgentUrl);
+            log.info("*** SerpAPI Agent configured at: {}", serpapiAgentUrl);
+        }
 
         // Schedule MCP tool discovery
         scheduler.scheduleWithFixedDelay(
@@ -80,12 +103,29 @@ public class ToolDiscoveryService {
                 pollIntervalSeconds,
                 TimeUnit.SECONDS);
 
-        // Schedule A2A tool discovery
-        scheduler.scheduleWithFixedDelay(
-                this::discoverA2aTools,
-                initialDelaySeconds,
-                pollIntervalSeconds,
-                TimeUnit.SECONDS);
+        // Schedule A2A Booking tool discovery (if enabled)
+        if (bookingAgentEnabled) {
+            scheduler.scheduleWithFixedDelay(
+                    this::discoverA2aTools,
+                    initialDelaySeconds,
+                    pollIntervalSeconds,
+                    TimeUnit.SECONDS);
+        } else {
+            log.info("*** A2A Booking Agent discovery disabled");
+            a2aDiscovered.set(true); // Mark as "discovered" (skipped)
+        }
+
+        // Schedule SerpAPI tool discovery (if enabled)
+        if (serpapiAgentEnabled) {
+            scheduler.scheduleWithFixedDelay(
+                    this::discoverSerpapiTools,
+                    initialDelaySeconds,
+                    pollIntervalSeconds,
+                    TimeUnit.SECONDS);
+        } else {
+            log.info("*** A2A SerpAPI Agent discovery disabled");
+            serpapiDiscovered.set(true); // Mark as "discovered" (skipped)
+        }
     }
 
     @PreDestroy
@@ -158,25 +198,25 @@ public class ToolDiscoveryService {
         }
 
         try {
-            log.debug("*** Polling A2A agent for skills...");
+            log.debug("*** Polling A2A Booking agent for skills...");
 
             // Discover the agent
-            Map<String, Object> agentCard = a2aClient.discoverAgent();
+            Map<String, Object> agentCard = a2aBookingClient.discoverAgent();
 
             if (agentCard == null) {
                 a2aErrorMessage = "A2A Booking Agent is not responding. " +
                         "Please ensure the A2A Booking Agent service is running.";
-                log.warn("*** A2A agent not found");
+                log.warn("*** A2A Booking agent not found");
                 return;
             }
 
             // Get skills
-            List<Map<String, Object>> skills = a2aClient.getSkills();
+            List<Map<String, Object>> skills = a2aBookingClient.getSkills();
 
             if (skills.isEmpty()) {
                 a2aErrorMessage = "A2A Booking Agent is running but no skills are available. " +
                         "Please check the agent configuration.";
-                log.warn("*** A2A agent returned 0 skills");
+                log.warn("*** A2A Booking agent returned 0 skills");
                 return;
             }
 
@@ -185,22 +225,77 @@ public class ToolDiscoveryService {
             for (Map<String, Object> skill : skills) {
                 String id = (String) skill.get("id");
                 String name = (String) skill.get("name");
-                log.info("*** Discovered A2A skill: {} ({})", name, id);
-                a2aTools.add(new A2AToolAdapter(a2aClient, skill));
+                log.info("*** Discovered A2A Booking skill: {} ({})", name, id);
+                a2aTools.add(new A2AToolAdapter(a2aBookingClient, skill));
             }
 
             a2aDiscovered.set(true);
             a2aErrorMessage = null;
-            log.info("*** Successfully discovered {} A2A skills", a2aTools.size());
+            log.info("*** Successfully discovered {} A2A Booking skills", a2aTools.size());
 
             // Notify listeners
-            notifyToolsDiscovered("A2A", a2aTools);
+            notifyToolsDiscovered("A2A-Booking", a2aTools);
 
         } catch (Exception e) {
             a2aErrorMessage = "Unable to connect to A2A Booking Agent at " + getA2aServerUrl() + ". " +
                     "Error: " + e.getMessage() + ". " +
                     "Please ensure the service is running (port 8082).";
-            log.warn("*** Failed to discover A2A skills: {}", e.getMessage());
+            log.warn("*** Failed to discover A2A Booking skills: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Discover tools from SerpAPI A2A agent
+     */
+    private void discoverSerpapiTools() {
+        if (serpapiDiscovered.get() || !serpapiAgentEnabled || a2aSerpapiClient == null) {
+            return; // Already discovered, disabled, or not configured
+        }
+
+        try {
+            log.debug("*** Polling A2A SerpAPI agent for skills...");
+
+            // Discover the agent
+            Map<String, Object> agentCard = a2aSerpapiClient.discoverAgent();
+
+            if (agentCard == null) {
+                serpapiErrorMessage = "A2A SerpAPI Agent is not responding. " +
+                        "Please ensure the SerpAPI Agent service is running.";
+                log.warn("*** A2A SerpAPI agent not found");
+                return;
+            }
+
+            // Get skills
+            List<Map<String, Object>> skills = a2aSerpapiClient.getSkills();
+
+            if (skills.isEmpty()) {
+                serpapiErrorMessage = "A2A SerpAPI Agent is running but no skills are available. " +
+                        "Please check the agent configuration.";
+                log.warn("*** A2A SerpAPI agent returned 0 skills");
+                return;
+            }
+
+            // Clear previous tools and add new ones
+            serpapiTools.clear();
+            for (Map<String, Object> skill : skills) {
+                String id = (String) skill.get("id");
+                String name = (String) skill.get("name");
+                log.info("*** Discovered A2A SerpAPI skill: {} ({})", name, id);
+                serpapiTools.add(new A2AToolAdapter(a2aSerpapiClient, skill));
+            }
+
+            serpapiDiscovered.set(true);
+            serpapiErrorMessage = null;
+            log.info("*** Successfully discovered {} A2A SerpAPI skills", serpapiTools.size());
+
+            // Notify listeners
+            notifyToolsDiscovered("A2A-SerpAPI", serpapiTools);
+
+        } catch (Exception e) {
+            serpapiErrorMessage = "Unable to connect to A2A SerpAPI Agent at " + serpapiAgentUrl + ". " +
+                    "Error: " + e.getMessage() + ". " +
+                    "Please ensure the service is running (port 8083).";
+            log.warn("*** Failed to discover A2A SerpAPI skills: {}", e.getMessage());
         }
     }
 
@@ -211,6 +306,7 @@ public class ToolDiscoveryService {
         List<BaseTool> allTools = new ArrayList<>();
         allTools.addAll(mcpTools);
         allTools.addAll(a2aTools);
+        allTools.addAll(serpapiTools);
         return allTools;
     }
 
@@ -222,17 +318,31 @@ public class ToolDiscoveryService {
     }
 
     /**
-     * Check if A2A tools are available
+     * Check if A2A Booking tools are available
      */
     public boolean isA2aAvailable() {
-        return a2aDiscovered.get() && !a2aTools.isEmpty();
+        return !bookingAgentEnabled || (a2aDiscovered.get() && !a2aTools.isEmpty());
+    }
+
+    /**
+     * Check if SerpAPI tools are available
+     */
+    public boolean isSerpapiAvailable() {
+        return !serpapiAgentEnabled || (serpapiDiscovered.get() && !serpapiTools.isEmpty());
+    }
+
+    /**
+     * Check if SerpAPI agent is enabled
+     */
+    public boolean isSerpapiEnabled() {
+        return serpapiAgentEnabled;
     }
 
     /**
      * Check if all tools are available
      */
     public boolean areAllToolsAvailable() {
-        return isMcpAvailable() && isA2aAvailable();
+        return isMcpAvailable() && isA2aAvailable() && isSerpapiAvailable();
     }
 
     /**
@@ -249,10 +359,18 @@ public class ToolDiscoveryService {
             status.append("\n");
         }
 
-        if (!isA2aAvailable()) {
+        if (bookingAgentEnabled && !isA2aAvailable()) {
             status.append("⚠️ **Hotel Booking service is unavailable**\n");
             if (a2aErrorMessage != null) {
                 status.append("   → ").append(a2aErrorMessage).append("\n");
+            }
+            status.append("\n");
+        }
+
+        if (serpapiAgentEnabled && !isSerpapiAvailable()) {
+            status.append("⚠️ **Live Hotel Search (SerpAPI) is unavailable**\n");
+            if (serpapiErrorMessage != null) {
+                status.append("   → ").append(serpapiErrorMessage).append("\n");
             }
             status.append("\n");
         }
@@ -280,6 +398,10 @@ public class ToolDiscoveryService {
         boolean bookingNeeded = requestedAction.toLowerCase().contains("book") ||
                 requestedAction.toLowerCase().contains("reserve");
 
+        boolean liveSearchNeeded = requestedAction.toLowerCase().contains("live") ||
+                requestedAction.toLowerCase().contains("real") ||
+                requestedAction.toLowerCase().contains("actual");
+
         if (searchPricingNeeded && !isMcpAvailable()) {
             message.append("🔍 **Hotel Search & Pricing Service**\n");
             message.append("   Status: ❌ Unavailable\n");
@@ -289,7 +411,7 @@ public class ToolDiscoveryService {
             message.append("\n");
         }
 
-        if (bookingNeeded && !isA2aAvailable()) {
+        if (bookingNeeded && bookingAgentEnabled && !isA2aAvailable()) {
             message.append("📅 **Hotel Booking Service**\n");
             message.append("   Status: ❌ Unavailable\n");
             if (a2aErrorMessage != null) {
@@ -298,8 +420,17 @@ public class ToolDiscoveryService {
             message.append("\n");
         }
 
+        if (liveSearchNeeded && serpapiAgentEnabled && !isSerpapiAvailable()) {
+            message.append("🌐 **Live Hotel Search (SerpAPI)**\n");
+            message.append("   Status: ❌ Unavailable\n");
+            if (serpapiErrorMessage != null) {
+                message.append("   Reason: ").append(serpapiErrorMessage).append("\n");
+            }
+            message.append("\n");
+        }
+
         // If neither specific service is identified as needed, show general status
-        if (!searchPricingNeeded && !bookingNeeded) {
+        if (!searchPricingNeeded && !bookingNeeded && !liveSearchNeeded) {
             String status = getToolAvailabilityStatus();
             if (status != null) {
                 message.append(status);
@@ -321,8 +452,10 @@ public class ToolDiscoveryService {
         log.info("*** Forcing tool re-discovery...");
         mcpDiscovered.set(false);
         a2aDiscovered.set(false);
+        serpapiDiscovered.set(false);
         mcpTools.clear();
         a2aTools.clear();
+        serpapiTools.clear();
     }
 
     /**
@@ -359,7 +492,7 @@ public class ToolDiscoveryService {
 
     private String getA2aServerUrl() {
         try {
-            return a2aClient.getClass().getDeclaredField("a2aServerUrl").get(a2aClient).toString();
+            return a2aBookingClient.getServerUrl();
         } catch (Exception e) {
             return "http://localhost:8082";
         }
