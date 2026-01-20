@@ -147,8 +147,16 @@ public class ADKAgent implements ToolDiscoveryService.ToolDiscoveryListener {
                             - searchHotelsLive: Search for REAL hotels with live pricing (required: destination, optional: checkInDate, checkOutDate, adults, currency, minPrice, maxPrice, minRating)
                             - getHotelDetails: Get detailed info about a specific hotel (required: propertyToken)
 
-                            When users ask for "real", "live", "actual" or "current" hotel data, use searchHotelsLive instead of searchHotels.
+                            ⚠️ CRITICAL TOOL SELECTION RULE:
+                            When the user's query contains the word "live", "real", "actual", or "current", you MUST use searchHotelsLive.
+                            Examples:
+                            - "search live hotels in Paris" → MUST use searchHotelsLive
+                            - "find live hotel prices in London" → MUST use searchHotelsLive
+                            - "show me real hotels in Tokyo" → MUST use searchHotelsLive
+                            - "search hotels in Paris" (no "live") → use searchHotels (mock data)
+
                             The searchHotelsLive tool provides real-time pricing and availability from Google Hotels.
+                            Do NOT use searchHotels (mock data) when the user explicitly asks for "live" results.
                             """);
         }
 
@@ -210,10 +218,11 @@ public class ADKAgent implements ToolDiscoveryService.ToolDiscoveryListener {
             log.info("*** Processing client message: [{}] with sessionId: [{}]", userMessage,
                     sessionState.getSessionId());
 
-            // Check if tools are available - if not, return friendly error message
-            if (!toolDiscoveryService.areAllToolsAvailable()) {
+            // Check if core tools (MCP) are available - agent can still run with partial
+            // tools
+            if (!toolDiscoveryService.areCoreToolsAvailable()) {
                 String errorMessage = toolDiscoveryService.getUserFriendlyErrorMessage(userMessage);
-                log.warn("*** Tools not available. Returning friendly error to user.");
+                log.warn("*** Core tools not available. Returning friendly error to user.");
 
                 try {
                     Map<String, Object> a2uiResponse = com.hotel.booking.util.A2UIBuilder.wrapText(errorMessage);
@@ -227,6 +236,15 @@ public class ADKAgent implements ToolDiscoveryService.ToolDiscoveryListener {
 
                 future.complete(null);
                 return future;
+            }
+
+            // Log which optional services are unavailable (but continue anyway)
+            if (!toolDiscoveryService.areAllToolsAvailable()) {
+                log.info(
+                        "*** Some optional tools unavailable - proceeding with available tools: MCP={}, A2A-Booking={}, SerpAPI={}",
+                        toolDiscoveryService.isMcpAvailable(),
+                        toolDiscoveryService.isA2aAvailable(),
+                        toolDiscoveryService.isSerpapiAvailable());
             }
 
             // Check if agent is available

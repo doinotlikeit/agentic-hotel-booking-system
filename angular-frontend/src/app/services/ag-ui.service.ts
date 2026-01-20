@@ -13,6 +13,7 @@ export interface AgentMessage {
   content: string;
   type: 'user' | 'agent';
   data?: any; // A2UI metadata or other structured data
+  readAloud?: boolean; // Flag to indicate the response should be read aloud
 }
 
 export interface AgentEvent {
@@ -115,6 +116,7 @@ export class AgUiService {
     console.log('data.message:', data.message);
     console.log('data.message.data:', data.message?.data);
     console.log('data.message.messageId:', data.message?.messageId);
+    console.log('data.message.readAloud:', data.message?.readAloud);
     
     if (data.message) {
       const agentMessage: AgentMessage = {
@@ -133,6 +135,12 @@ export class AgUiService {
         console.log('✅ A2UI metadata attached:', agentMessage.data);
       } else {
         console.log('❌ No A2UI metadata found');
+      }
+
+      // Preserve readAloud flag if present
+      if (data.message.readAloud) {
+        agentMessage.readAloud = true;
+        console.log('✅ readAloud flag set to true');
       }
 
       console.log('Final agentMessage:', agentMessage);

@@ -164,6 +164,21 @@
         Send
       </button>
 
+      <!-- Text-to-Speech Button -->
+      <button
+        *ngIf="ttsSupported"
+        mat-raised-button
+        [color]="isSpeaking ? 'warn' : 'accent'"
+        (click)="toggleSpeaking()"
+        [class.speaking]="isSpeaking"
+        [matTooltip]="
+          isSpeaking ? 'Stop reading' : 'Read last response (say: read results)'
+        "
+      >
+        <mat-icon>{{ isSpeaking ? "stop" : "volume_up" }}</mat-icon>
+        {{ isSpeaking ? "Stop" : "Read" }}
+      </button>
+
       <button mat-raised-button color="warn" (click)="clearMessages()">
         <mat-icon>clear_all</mat-icon>
         Clear

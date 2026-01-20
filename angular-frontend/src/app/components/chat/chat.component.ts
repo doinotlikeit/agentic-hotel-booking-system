@@ -34,6 +34,13 @@ export class ChatComponent implements OnInit, OnDestroy {
   voiceSupported: boolean = false;
   private speechRecognition: any;
   
+  // Text-to-speech (TTS) state
+  isSpeaking: boolean = false;
+  ttsSupported: boolean = false;
+  private speechSynthesis: SpeechSynthesis | null = null;
+  private currentUtterance: SpeechSynthesisUtterance | null = null;
+  private lastReadMessageId: string | null = null; // Track last read message to prevent duplicates
+  
   // Cache for rendered A2UI content to prevent re-rendering on every change detection
   private a2uiRenderCache = new Map<string, SafeHtml>();
   
@@ -53,6 +60,7 @@ export class ChatComponent implements OnInit, OnDestroy {
     private ngZone: NgZone
   ) {
     this.initSpeechRecognition();
+    this.initTextToSpeech();
   }
 
   ngOnInit(): void {
@@ -69,6 +77,26 @@ export class ChatComponent implements OnInit, OnDestroy {
     // Subscribe to messages
     this.subscriptions.push(
       this.agUiService.getMessages().subscribe(messages => {
+        // Check if the latest message is an agent message with readAloud flag
+        if (messages.length > 0) {
+          const latestMessage = messages[messages.length - 1];
+          console.log('🔊 TTS Check - type:', latestMessage.type, 
+                      'readAloud:', latestMessage.readAloud, 
+                      'messageId:', latestMessage.messageId,
+                      'lastReadId:', this.lastReadMessageId);
+          // Only auto-read if:
+          // 1. It's an agent message
+          // 2. readAloud flag is explicitly true (from backend detecting "read results" command)
+          // 3. We haven't already read this message (prevent duplicate reads)
+          if (latestMessage.type === 'agent' && 
+              latestMessage.readAloud === true && 
+              latestMessage.messageId !== this.lastReadMessageId) {
+            console.log('🔊 TTS: Auto-reading message', latestMessage.messageId);
+            this.lastReadMessageId = latestMessage.messageId;
+            // Auto-read the response after a short delay to allow UI to render
+            setTimeout(() => this.readMessage(latestMessage), 500);
+          }
+        }
         this.messages = messages;
         setTimeout(() => this.scrollToBottom(), 100);
       })
@@ -118,7 +146,7 @@ export class ChatComponent implements OnInit, OnDestroy {
             }
           }
           
-          // Update input with final or interim transcript
+          // Update input with transcript - backend will detect "read results" commands
           if (finalTranscript) {
             this.currentMessage = finalTranscript;
           } else if (interimTranscript) {
@@ -158,6 +186,160 @@ export class ChatComponent implements OnInit, OnDestroy {
     } else {
       this.currentMessage = ''; // Clear input before listening
       this.speechRecognition.start();
+    }
+  }
+
+  /**
+   * Initialize Text-to-Speech (TTS)
+   */
+  private initTextToSpeech(): void {
+    if ('speechSynthesis' in window) {
+      this.ttsSupported = true;
+      this.speechSynthesis = window.speechSynthesis;
+    } else {
+      this.ttsSupported = false;
+      console.log('Text-to-speech not supported in this browser');
+    }
+  }
+
+  /**
+   * Read a specific message aloud
+   */
+  readMessage(message: AgentMessage): void {
+    if (!this.ttsSupported || !this.speechSynthesis) {
+      return;
+    }
+
+    const textToRead = this.extractReadableText(message);
+    
+    if (textToRead) {
+      this.speak(textToRead);
+    }
+  }
+
+  /**
+   * Read the last agent response aloud
+   */
+  readLastAgentResponse(): void {
+    if (!this.ttsSupported || !this.speechSynthesis) {
+      return;
+    }
+
+    // Find the last agent message
+    const agentMessages = this.messages.filter(m => m.type === 'agent');
+    if (agentMessages.length === 0) {
+      this.speak('No agent response to read.');
+      return;
+    }
+
+    const lastMessage = agentMessages[agentMessages.length - 1];
+    this.readMessage(lastMessage);
+  }
+
+  /**
+   * Extract readable text from a message (strips HTML/markdown)
+   */
+  private extractReadableText(message: AgentMessage): string {
+    let text = message.content || '';
+    
+    // If it has A2UI metadata, try to extract text from components
+    if (this.hasA2UIContent(message)) {
+      const components = this.getA2UIComponents(message);
+      const textParts: string[] = [];
+      
+      for (const comp of components) {
+        if (comp.type === 'heading' || comp.type === 'subheading' || comp.type === 'text') {
+          textParts.push(comp.content || comp.text || '');
+        } else if (comp.type === 'card') {
+          if (comp.title) textParts.push(comp.title);
+          if (comp.subtitle) textParts.push(comp.subtitle);
+          if (comp.content) textParts.push(comp.content);
+        } else if (comp.type === 'status') {
+          textParts.push(`Status: ${comp.status}. ${comp.message || ''}`);
+        }
+      }
+      
+      if (textParts.length > 0) {
+        text = textParts.join('. ');
+      }
+    }
+    
+    // If still empty, return a default message
+    if (!text || text.trim() === '') {
+      return 'No readable content found in the response.';
+    }
+    
+    // Strip HTML tags
+    text = text.replace(/<[^>]*>/g, '');
+    
+    // Strip markdown formatting
+    text = text.replace(/\*\*([^*]+)\*\*/g, '$1'); // Bold
+    text = text.replace(/\*([^*]+)\*/g, '$1'); // Italic
+    text = text.replace(/`([^`]+)`/g, '$1'); // Code
+    text = text.replace(/#{1,6}\s/g, ''); // Headers
+    text = text.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1'); // Links
+    
+    // Clean up extra whitespace
+    text = text.replace(/\s+/g, ' ').trim();
+    
+    return text;
+  }
+
+  /**
+   * Speak text using TTS
+   */
+  private speak(text: string): void {
+    if (!this.speechSynthesis) return;
+
+    // Cancel any ongoing speech
+    this.stopSpeaking();
+
+    this.currentUtterance = new SpeechSynthesisUtterance(text);
+    this.currentUtterance.lang = 'en-US';
+    this.currentUtterance.rate = 1.0;
+    this.currentUtterance.pitch = 1.0;
+    this.currentUtterance.volume = 1.0;
+
+    this.currentUtterance.onstart = () => {
+      this.ngZone.run(() => {
+        this.isSpeaking = true;
+      });
+    };
+
+    this.currentUtterance.onend = () => {
+      this.ngZone.run(() => {
+        this.isSpeaking = false;
+      });
+    };
+
+    this.currentUtterance.onerror = (event) => {
+      this.ngZone.run(() => {
+        console.error('TTS error:', event.error);
+        this.isSpeaking = false;
+      });
+    };
+
+    this.speechSynthesis.speak(this.currentUtterance);
+  }
+
+  /**
+   * Stop current TTS playback
+   */
+  stopSpeaking(): void {
+    if (this.speechSynthesis) {
+      this.speechSynthesis.cancel();
+      this.isSpeaking = false;
+    }
+  }
+
+  /**
+   * Toggle TTS - read or stop
+   */
+  toggleSpeaking(): void {
+    if (this.isSpeaking) {
+      this.stopSpeaking();
+    } else {
+      this.readLastAgentResponse();
     }
   }
 
