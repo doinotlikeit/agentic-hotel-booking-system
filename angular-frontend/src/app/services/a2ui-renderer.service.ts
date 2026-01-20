@@ -119,6 +119,9 @@ export class A2uiRendererService {
       case 'image':
         return this.renderImage(component);
 
+      case 'image-gallery':
+        return this.renderImageGallery(component);
+
       // Data components
       case 'json':
         return this.renderJson(component);
@@ -134,12 +137,14 @@ export class A2uiRendererService {
   private renderText(component: A2UIComponent): string {
     const variant = component['variant'] || 'body';
     const align = component['align'] || 'left';
-    const content = component['content'] || '';
+    const content = (component['content'] || '').trim();
 
     // Parse markdown in the content
     let renderedContent: string;
     try {
       renderedContent = marked.parse(content) as string;
+      // Remove empty paragraphs that markdown may generate
+      renderedContent = renderedContent.replace(/<p>\s*<\/p>/g, '').trim();
     } catch (e) {
       renderedContent = this.escapeHtml(content);
     }
@@ -154,7 +159,9 @@ export class A2uiRendererService {
     // Parse markdown in card content for proper formatting
     let contentHtml: string;
     try {
-      contentHtml = marked.parse(component['content'] || '') as string;
+      contentHtml = marked.parse((component['content'] || '').trim()) as string;
+      // Remove empty paragraphs that markdown may generate
+      contentHtml = contentHtml.replace(/<p>\s*<\/p>/g, '').trim();
     } catch (e) {
       contentHtml = this.escapeHtml(component['content'] || '');
     }
@@ -424,6 +431,47 @@ export class A2uiRendererService {
         ${caption ? `<p class="a2ui-image-caption">${this.escapeHtml(caption)}</p>` : ''}
       </div>
     `;
+  }
+
+  /**
+   * Render Image Gallery component
+   */
+  private renderImageGallery(component: A2UIComponent): string {
+    const images = component['images'] || [];
+    const alt = component['alt'] || '';
+    const maxImages = component['maxImages'] || 6;
+    const columns = component['columns'] || 3;
+    
+    if (!images || images.length === 0) {
+      return '<div class="a2ui-no-images">No images available</div>';
+    }
+    
+    const displayImages = images.slice(0, maxImages);
+    
+    // Placeholder SVG for failed images (hotel icon)
+    const placeholderSvg = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='287' height='192' viewBox='0 0 287 192'%3E%3Crect fill='%23e0e0e0' width='287' height='192'/%3E%3Ctext x='50%25' y='45%25' font-family='Arial' font-size='48' fill='%239e9e9e' text-anchor='middle'%3E🏨%3C/text%3E%3Ctext x='50%25' y='65%25' font-family='Arial' font-size='14' fill='%239e9e9e' text-anchor='middle'%3EImage unavailable%3C/text%3E%3C/svg%3E`;
+    
+    const imageHtml = displayImages.map((src: string, index: number) => {
+      // Use referrerPolicy="no-referrer" to bypass Google's referrer restrictions
+      // Use crossorigin="anonymous" and add error handler with placeholder
+      return `<div class="a2ui-gallery-item">
+        <img src="${src}" 
+             alt="${this.escapeHtml(alt)}" 
+             class="a2ui-gallery-img" 
+             referrerpolicy="no-referrer"
+             crossorigin="anonymous"
+             loading="lazy"
+             onerror="this.onerror=null; this.src='${placeholderSvg}'; this.classList.add('a2ui-img-error');" />
+      </div>`;
+    }).join('');
+    
+    const html = `
+      <div class="a2ui-image-gallery" style="display: grid; grid-template-columns: repeat(${columns}, 1fr); gap: 8px;">
+        ${imageHtml}
+      </div>
+    `;
+    
+    return html;
   }
 
   /**

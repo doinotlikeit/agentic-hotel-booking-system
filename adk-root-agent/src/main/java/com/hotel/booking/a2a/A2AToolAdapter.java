@@ -179,7 +179,16 @@ public class A2AToolAdapter extends BaseTool {
                     return errorResult;
                 }
 
-                log.info("*** A2A skill '{}' returned successfully", skillName);
+                log.info("*** A2A skill '{}' returned successfully. Result keys: {}", skillName, result.keySet());
+                log.info("*** Checking conditions: skillId='{}', hasHotels={}", skillId, result.containsKey("hotels"));
+
+                // Special formatting for hotel search results with images
+                if ("search-hotels-live".equals(skillId) && result.containsKey("hotels")) {
+                    log.info("*** Formatting hotel search results with A2UI...");
+                    Map<String, Object> formatted = formatHotelSearchResults(result);
+                    log.info("*** Formatted A2UI response has keys: {}", formatted.keySet());
+                    return formatted;
+                }
 
                 // Return the raw result directly - the LLM will format it nicely
                 return result;
@@ -191,5 +200,130 @@ public class A2AToolAdapter extends BaseTool {
                 return errorResult;
             }
         });
+    }
+
+    /**
+     * Format hotel search results with A2UI metadata including images
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> formatHotelSearchResults(Map<String, Object> result) {
+        try {
+            List<Map<String, Object>> hotels = (List<Map<String, Object>>) result.get("hotels");
+            if (hotels == null || hotels.isEmpty()) {
+                return result; // Return as-is if no hotels
+            }
+
+            // Create A2UI formatted response
+            List<Map<String, Object>> components = new ArrayList<>();
+
+            // Add header
+            components.add(Map.of(
+                    "type", "heading",
+                    "content", "🏨 Live Hotel Search Results"));
+
+            // Add summary
+            String destination = (String) result.getOrDefault("destination", "Unknown");
+            Integer hotelCount = (Integer) result.getOrDefault("hotelCount", hotels.size());
+            components.add(Map.of(
+                    "type", "subheading",
+                    "content", String.format("Found %d hotels in %s", hotelCount, destination)));
+
+            // Add each hotel as a card with images
+            for (Map<String, Object> hotel : hotels) {
+                components.addAll(createHotelComponents(hotel));
+            }
+
+            // Return A2UI formatted response
+            Map<String, Object> a2uiResponse = new HashMap<>();
+            a2uiResponse.put("format", "a2ui");
+            a2uiResponse.put("version", "1.0");
+            a2uiResponse.put("components", components);
+
+            return a2uiResponse;
+
+        } catch (Exception e) {
+            log.error("Error formatting hotel search results", e);
+            return result; // Return original result on error
+        }
+    }
+
+    /**
+     * Create hotel components (card + image gallery)
+     */
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> createHotelComponents(Map<String, Object> hotel) {
+        List<Map<String, Object>> components = new ArrayList<>();
+
+        // Add the hotel card
+        components.add(createHotelCard(hotel));
+
+        // Add image gallery if images are available
+        List<String> images = (List<String>) hotel.get("images");
+        if (images != null && !images.isEmpty()) {
+            String name = (String) hotel.getOrDefault("name", "Unknown Hotel");
+            Map<String, Object> gallery = new HashMap<>();
+            gallery.put("type", "image-gallery");
+            gallery.put("images", images);
+            gallery.put("alt", name + " photos");
+            gallery.put("maxImages", 3);
+            gallery.put("columns", 3);
+            components.add(gallery);
+        }
+
+        return components;
+    }
+
+    /**
+     * Create a hotel card component
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> createHotelCard(Map<String, Object> hotel) {
+        String name = (String) hotel.getOrDefault("name", "Unknown Hotel");
+        Double rating = (Double) hotel.get("rating");
+        Integer reviewCount = (Integer) hotel.get("reviewCount");
+        String price = (String) hotel.get("price");
+        String currency = (String) hotel.getOrDefault("currency", "USD");
+        List<String> images = (List<String>) hotel.get("images");
+
+        // Build card content
+        StringBuilder content = new StringBuilder();
+
+        // Rating and reviews
+        if (rating != null) {
+            content.append(String.format("⭐ %.1f", rating));
+            if (reviewCount != null && reviewCount > 0) {
+                content.append(String.format(" (%d reviews)", reviewCount));
+            }
+            content.append("\n");
+        }
+
+        // Price
+        if (price != null && !price.isEmpty()) {
+            content.append(String.format("💰 %s %s\n", price, currency));
+        }
+
+        // Location
+        Map<String, Object> location = (Map<String, Object>) hotel.get("location");
+        if (location != null) {
+            String address = (String) location.get("address");
+            if (address != null) {
+                content.append(String.format("📍 %s\n", address));
+            }
+        }
+
+        // Amenities (limit to 3)
+        List<String> amenities = (List<String>) hotel.get("amenities");
+        if (amenities != null && !amenities.isEmpty()) {
+            List<String> topAmenities = amenities.subList(0, Math.min(3, amenities.size()));
+            content.append(String.format("✨ %s\n", String.join(", ", topAmenities)));
+        }
+
+        // Create card component
+        Map<String, Object> card = new HashMap<>();
+        card.put("type", "card");
+        card.put("title", name);
+        card.put("content", content.toString().trim());
+
+        return card;
     }
 }

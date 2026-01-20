@@ -127,6 +127,7 @@ The frontend can render these generic UI components:
 | `table` | Tabular data | **Pagination, Sorting, Filtering** |
 | `textfield` | Input fields | - |
 | `image` | Images with captions | - |
+| `image-gallery` | Grid of multiple images | **Lazy loading, Grid layout** |
 | `status` | Status indicators | - |
 | `divider` | Horizontal separators | - |
 | `json` | JSON data display | **Tree view with expand/collapse** |

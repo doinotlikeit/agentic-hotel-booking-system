@@ -33,12 +33,38 @@ public class A2AClient {
     // Cached agent card
     private Map<String, Object> agentCard;
 
+    /**
+     * Default constructor for Spring injection
+     */
+    public A2AClient() {
+    }
+
+    /**
+     * Constructor for programmatic instantiation with a specific URL
+     */
+    public A2AClient(String serverUrl) {
+        this.a2aServerUrl = serverUrl;
+        this.restClient = RestClient.builder()
+                .baseUrl(serverUrl)
+                .build();
+        log.info("A2A Client created with server URL: {}", serverUrl);
+    }
+
     @PostConstruct
     public void init() {
-        this.restClient = RestClient.builder()
-                .baseUrl(a2aServerUrl)
-                .build();
-        log.info("A2A Client initialized with server URL: {}", a2aServerUrl);
+        if (this.restClient == null) {
+            this.restClient = RestClient.builder()
+                    .baseUrl(a2aServerUrl)
+                    .build();
+            log.info("A2A Client initialized with server URL: {}", a2aServerUrl);
+        }
+    }
+
+    /**
+     * Get the configured server URL
+     */
+    public String getServerUrl() {
+        return a2aServerUrl;
     }
 
     /**

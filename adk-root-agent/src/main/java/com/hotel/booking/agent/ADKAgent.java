@@ -86,10 +86,11 @@ public class ADKAgent implements ToolDiscoveryService.ToolDiscoveryListener {
     private synchronized void rebuildAgent() {
         List<BaseTool> allTools = toolDiscoveryService.getAllTools();
 
-        log.info("*** Rebuilding agent with {} tools (MCP: {}, A2A: {})",
+        log.info("*** Rebuilding agent with {} tools (MCP: {}, A2A-Booking: {}, A2A-SerpAPI: {})",
                 allTools.size(),
                 toolDiscoveryService.getMcpTools().size(),
-                toolDiscoveryService.getA2aTools().size());
+                toolDiscoveryService.getA2aTools().size(),
+                toolDiscoveryService.getSerpapiTools().size());
 
         try {
             BaseAgent agent = LlmAgent.builder()
@@ -111,7 +112,9 @@ public class ADKAgent implements ToolDiscoveryService.ToolDiscoveryListener {
     }
 
     private String buildAgentInstruction() {
-        return """
+        // Build dynamic instruction based on enabled features
+        StringBuilder instruction = new StringBuilder();
+        instruction.append("""
                 You are a helpful hotel booking assistant. Help users search for and book hotels.
 
                 ⚠️ CRITICAL RULES - MUST FOLLOW ⚠️:
@@ -130,29 +133,73 @@ public class ADKAgent implements ToolDiscoveryService.ToolDiscoveryListener {
                 - If you want to call a tool, USE THE FUNCTION CALLING MECHANISM, not text output
 
                 Tool Usage (use function calling, not text):
-                - searchHotels: Search for hotels (required: destination, optional: minRating, maxPrice)
+                - searchHotels: Search for hotels using mock data (required: destination, optional: minRating, maxPrice)
                 - bookHotel: Book a room (required: hotelName, checkInDate, checkOutDate, guestName)
                 - getHotelPrice: Get pricing (required: hotelName, numberOfNights)
+                """);
 
-                📋 RESPONSE FORMATTING - CRITICAL:
-                When presenting tool results to the user, you MUST include ALL important details:
-                - For bookings: ALWAYS include the booking reference/confirmation number, hotel name, guest name, dates, total price
-                - For searches: Include hotel names, ratings, prices, and locations
-                - For prices: Include the hotel name, price per night, and total cost
-                - Format the response nicely with clear labels for each piece of information
-                - NEVER summarize by omitting important details like booking references or prices
+        // Add SerpAPI tool info if enabled
+        if (toolDiscoveryService.isSerpapiEnabled()) {
+            instruction
+                    .append("""
 
-                Example booking response format:
-                "✅ Booking Confirmed!
-                - Booking Reference: [reference from tool]
-                - Hotel: [hotel name]
-                - Guest: [guest name]
-                - Check-in: [date]
-                - Check-out: [date]
-                - Total Price: [price]"
+                            🌐 LIVE HOTEL SEARCH (Real-time data from Google Hotels):
+                            - searchHotelsLive: Search for REAL hotels with live pricing (required: destination, optional: checkInDate, checkOutDate, adults, currency, minPrice, maxPrice, minRating)
+                            - getHotelDetails: Get detailed info about a specific hotel (required: propertyToken)
 
-                REMEMBER: Use function calling to invoke tools. Never output tool syntax as text!
-                """;
+                            When users ask for "real", "live", "actual" or "current" hotel data, use searchHotelsLive instead of searchHotels.
+                            The searchHotelsLive tool provides real-time pricing and availability from Google Hotels.
+                            """);
+        }
+
+        instruction
+                .append("""
+
+                        📋 RESPONSE FORMATTING - CRITICAL:
+                        When presenting tool results to the user, you MUST include ALL important details:
+                        - For bookings: ALWAYS include the booking reference/confirmation number, hotel name, guest name, dates, total price
+                        - For searches: Include hotel names, ratings, prices, and locations
+                        - For prices: Include the hotel name, price per night, and total cost
+                        - Format the response nicely with clear labels for each piece of information
+                        - NEVER summarize by omitting important details like booking references or prices
+
+                        🎨 A2UI FORMAT - FOR HOTEL SEARCH RESULTS WITH IMAGES:
+                        When the tool returns hotels with images, you MUST format the response as a JSON object with this EXACT structure:
+                        {"format":"a2ui","components":[...array of components...]}
+
+                        For EACH hotel with images, output TWO components in sequence:
+                        1. A "card" component with the hotel details
+                        2. An "image-gallery" component with the hotel's images
+
+                        Component types:
+                        - {"type":"heading","content":"Hotels in [City]"} - for the title
+                        - {"type":"card","title":"Hotel Name","subtitle":"⭐ 4.5 (123 reviews)","content":"**$150/night** - Total: $300\\n\\nAmenities: Free WiFi, Pool\\nLocation: Downtown"} - for each hotel
+                        - {"type":"image-gallery","images":["url1","url2","url3"]} - for hotel images (place IMMEDIATELY after the card)
+
+                        IMPORTANT A2UI RULES:
+                        - Output ONLY the JSON object, no text before or after
+                        - Each hotel MUST have both a card AND an image-gallery component (if images exist)
+                        - The image-gallery MUST come directly after its corresponding card
+                        - Use markdown formatting inside "content" fields (bold, newlines, etc)
+                        - Include the price prominently in the card content
+                        - Limit to 3-4 images per hotel
+
+                        Example A2UI output for hotels:
+                        {"format":"a2ui","components":[{"type":"heading","content":"Hotels in London"},{"type":"card","title":"The Grand Hotel","subtitle":"⭐ 4.5 (200 reviews) • 4-star","content":"**$175/night** - Total: $350\\n\\n📍 Central London\\n✅ Free WiFi, Restaurant, Spa"},{"type":"image-gallery","images":["https://example.com/img1.jpg","https://example.com/img2.jpg"]},{"type":"card","title":"Budget Inn","subtitle":"⭐ 3.8 (50 reviews)","content":"**$65/night** - Total: $130\\n\\n📍 East London\\n✅ Free WiFi, Parking"},{"type":"image-gallery","images":["https://example.com/img3.jpg"]}]}
+
+                        Example booking response format:
+                        "✅ Booking Confirmed!
+                        - Booking Reference: [reference from tool]
+                        - Hotel: [hotel name]
+                        - Guest: [guest name]
+                        - Check-in: [date]
+                        - Check-out: [date]
+                        - Total Price: [price]"
+
+                        REMEMBER: Use function calling to invoke tools. Never output tool syntax as text!
+                        """);
+
+        return instruction.toString();
     }
 
     public CompletableFuture<Void> processAsync(AgentSessionState sessionState, String userMessage,
@@ -282,7 +329,8 @@ public class ADKAgent implements ToolDiscoveryService.ToolDiscoveryListener {
                                 } else if (part.functionResponse().isPresent()) {
                                     // Tool response - check if it contains A2UI metadata
                                     var funcResponse = part.functionResponse().get();
-                                    log.info("  Debug: Function Response from tool [{}]", funcResponse.name());
+                                    String toolNameFromResponse = funcResponse.name().orElse("tool");
+                                    log.info("  Debug: Function Response from tool [{}]", toolNameFromResponse);
                                     if (funcResponse.response().isPresent()) {
                                         try {
                                             Map<String, Object> responseMap = funcResponse.response().get();
@@ -290,7 +338,7 @@ public class ADKAgent implements ToolDiscoveryService.ToolDiscoveryListener {
 
                                             // Store for fallback if LLM fails to generate response
                                             lastToolResponse[0] = responseMap;
-                                            lastToolName[0] = funcResponse.name().orElse("tool");
+                                            lastToolName[0] = toolNameFromResponse;
 
                                             // If user explicitly requested JSON tree, send it immediately
                                             if (wantsJsonTree[0]) {
@@ -342,6 +390,23 @@ public class ADKAgent implements ToolDiscoveryService.ToolDiscoveryListener {
                                                 messageConsumer.accept(a2uiJson);
                                                 hasSpecificPart = true;
                                                 responseSentToFrontend[0] = true;
+                                            }
+                                            // NEW: Detect searchHotelsLive response and format it immediately
+                                            // This prevents the UI from hanging while waiting for LLM to format
+                                            else if ("searchHotelsLive".equals(toolNameFromResponse)
+                                                    && Boolean.TRUE.equals(responseMap.get("success"))
+                                                    && responseMap.containsKey("hotels")) {
+                                                log.info(
+                                                        "*** Detected searchHotelsLive response - formatting directly as A2UI");
+                                                Map<String, Object> a2uiResponse = formatToolResponseAsA2UI(
+                                                        toolNameFromResponse, responseMap);
+                                                ObjectMapper mapper = new ObjectMapper();
+                                                String a2uiJson = mapper.writeValueAsString(a2uiResponse);
+                                                log.info("*** Sending live hotel results directly to frontend");
+                                                messageConsumer.accept(a2uiJson);
+                                                hasSpecificPart = true;
+                                                responseSentToFrontend[0] = true;
+                                                suppressTextResponse[0] = true;
                                             }
                                         } catch (Exception e) {
                                             log.error("Error processing function response", e);
@@ -565,6 +630,93 @@ public class ADKAgent implements ToolDiscoveryService.ToolDiscoveryListener {
 
                 builder.addDivider();
                 builder.addBody("Would you like me to get pricing details or book any of these hotels?");
+            } else {
+                builder.addStatus("No hotels found for this destination.", "warning");
+            }
+        } else if ("searchHotelsLive".equals(toolName)) {
+            // Format LIVE hotel search results from SerpAPI with images
+            String destination = (String) response.get("destination");
+            String checkIn = (String) response.get("checkIn");
+            String checkOut = (String) response.get("checkOut");
+            List<Map<String, Object>> hotels = (List<Map<String, Object>>) response.get("hotels");
+            String source = (String) response.get("source");
+
+            builder.addHeading("🏨 Live Hotels in " + capitalize(destination));
+
+            if (checkIn != null && checkOut != null) {
+                builder.addBody("📅 " + checkIn + " → " + checkOut);
+            }
+            builder.addDivider();
+
+            if (hotels != null && !hotels.isEmpty()) {
+                for (Map<String, Object> hotel : hotels) {
+                    String hotelName = (String) hotel.get("name");
+                    Object rating = hotel.get("rating");
+                    Object reviewCount = hotel.get("reviewCount");
+                    Object stars = hotel.get("stars");
+                    String price = (String) hotel.get("price");
+                    Object pricePerNight = hotel.get("pricePerNight");
+                    Object totalPrice = hotel.get("totalPrice");
+                    List<String> images = (List<String>) hotel.get("images");
+                    Map<String, Object> location = (Map<String, Object>) hotel.get("location");
+                    List<String> amenities = (List<String>) hotel.get("amenities");
+
+                    // Build subtitle with rating
+                    StringBuilder subtitle = new StringBuilder();
+                    if (rating != null) {
+                        subtitle.append("⭐ ").append(rating);
+                        if (reviewCount != null) {
+                            subtitle.append(" (").append(reviewCount).append(" reviews)");
+                        }
+                    }
+                    if (stars != null) {
+                        subtitle.append(" • ").append(stars).append("-star");
+                    }
+
+                    // Build content with price and details
+                    StringBuilder content = new StringBuilder();
+                    if (price != null) {
+                        content.append("**").append(price).append("/night**");
+                        if (totalPrice != null) {
+                            content.append(" - Total: $").append(totalPrice);
+                        }
+                        content.append("\n\n");
+                    }
+
+                    if (location != null) {
+                        String address = (String) location.get("address");
+                        String neighborhood = (String) location.get("neighborhood");
+                        if (address != null && !address.isEmpty()) {
+                            content.append("📍 ").append(address).append("\n");
+                        } else if (neighborhood != null && !neighborhood.isEmpty()) {
+                            content.append("📍 ").append(neighborhood).append("\n");
+                        }
+                    }
+
+                    if (amenities != null && !amenities.isEmpty()) {
+                        content.append("✅ ");
+                        int maxAmenities = Math.min(amenities.size(), 4);
+                        content.append(String.join(", ", amenities.subList(0, maxAmenities)));
+                        if (amenities.size() > maxAmenities) {
+                            content.append("...");
+                        }
+                    }
+
+                    // Add card for hotel
+                    builder.addCard(hotelName, subtitle.toString(), content.toString());
+
+                    // Add image gallery if images exist
+                    if (images != null && !images.isEmpty()) {
+                        // Limit to 4 images
+                        List<String> limitedImages = images.size() > 4 ? images.subList(0, 4) : images;
+                        builder.addImageGallery(limitedImages);
+                    }
+                }
+
+                builder.addDivider();
+                if (source != null) {
+                    builder.addBody("_Data from " + source + "_");
+                }
             } else {
                 builder.addStatus("No hotels found for this destination.", "warning");
             }

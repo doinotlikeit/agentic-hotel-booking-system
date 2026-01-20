@@ -1,37 +1,38 @@
 # Hotel Booking System - AI Agent Application
 
-A full-stack AI-powered hotel booking system demonstrating multi-agent architecture with Angular frontend, Spring Boot ADK root agent, MCP tools server, and A2A booking agent.
+A full-stack AI-powered hotel booking system demonstrating multi-agent architecture with Angular frontend, Spring Boot ADK root agent, MCP tools server, A2A booking agent, and optional SerpAPI agent for live hotel data.
 
 ## Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           Hotel Booking System                              │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  ┌───────────────────┐        WebSocket       ┌───────────────────────┐     │
-│  │  Angular Frontend │◄──────────────────────►│   ADK Root Agent      │     │
-│  │  (Port 4200)      │                        │   (Port 8080)         │     │
-│  │                   │                        │                       │     │
-│  │  - Chat UI        │                        │  - Google ADK SDK     │     │
-│  │  - AG-UI Protocol │                        │  - Gemini/Vertex AI   │     │
-│  │  - A2U Components │                        │  - Tool Discovery     │     │
-│  └───────────────────┘                        │  - Session Management │     │
-│                                               └───────────┬───────────┘     │
-│                                                           │                 │
-│                              ┌────────────────────────────┼                 │
-│                              │                            │                 │
-│                              ▼                            ▼                 │
-│                 ┌─────────────────────┐     ┌─────────────────────────┐     │
-│                 │  MCP Hotel Tools    │     │  A2A Booking Agent      │     │
-│                 │  (Port 8081)        │     │  (Port 8082)            │     │
-│                 │                     │     │                         │     │
-│                 │  - searchHotels     │     │  - book-hotel skill     │     │
-│                 │  - getHotelPrice    │     │  - A2A Protocol         │     │
-│                 │  - MCP Protocol     │     │  - JSON-RPC             │     │
-│                 └─────────────────────┘     └─────────────────────────┘     │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                            Hotel Booking System                                  │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  ┌───────────────────┐        WebSocket       ┌───────────────────────┐        │
+│  │  Angular Frontend │◄──────────────────────►│   ADK Root Agent      │        │
+│  │  (Port 4200)      │                        │   (Port 8080)         │        │
+│  │                   │                        │                       │        │
+│  │  - Chat UI        │                        │  - Google ADK SDK     │        │
+│  │  - AG-UI Protocol │                        │  - Gemini/Vertex AI   │        │
+│  │  - A2U Components │                        │  - Tool Discovery     │        │
+│  └───────────────────┘                        │  - Session Management │        │
+│                                               └───────────┬───────────┘        │
+│                                                           │                    │
+│              ┌────────────────────────────────────────────┼────────────────┐   │
+│              │                            │               │                │   │
+│              ▼                            ▼               ▼                │   │
+│  ┌─────────────────────┐   ┌─────────────────────┐   ┌─────────────────────┐  │
+│  │  MCP Hotel Tools    │   │  A2A Booking Agent  │   │ A2A SerpAPI Agent   │  │
+│  │  (Port 8081)        │   │  (Port 8082)        │   │ (Port 8083)         │  │
+│  │                     │   │                     │   │ [Optional]          │  │
+│  │  - searchHotels     │   │  - book-hotel       │   │                     │  │
+│  │  - getHotelPrice    │   │  - A2A Protocol     │   │ - searchHotelsLive  │  │
+│  │  - MCP Protocol     │   │  - JSON-RPC         │   │ - getHotelDetails   │  │
+│  └─────────────────────┘   └─────────────────────┘   │ - Google Hotels API │  │
+│                                                       └─────────────────────┘  │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Projects
@@ -60,10 +61,10 @@ A full-stack AI-powered hotel booking system demonstrating multi-agent architect
 - **Key Features**:
   - Orchestrates MCP tools and A2A agents
   - Continuous tool discovery with retry logic
+  - Configurable agent enablement (booking, serpapi)
   - Real-time streaming responses
   - Session-based conversation history
   - Friendly error messages when services unavailable
-  - Ping/pong heartbeat mechanism
 
 ### 3. MCP Hotel Tools (`mcp-hotel-tools/`)
 - **Port**: 8081
@@ -89,6 +90,22 @@ A full-stack AI-powered hotel booking system demonstrating multi-agent architect
   - Booking confirmation with reference numbers
   - Standardized A2A protocol implementation
 
+### 5. A2A SerpAPI Agent (`a2a-serpapi-agent/`) - Optional
+- **Port**: 8083
+- **Framework**: Python FastAPI
+- **Protocol**: Agent-to-Agent (A2A) Protocol
+- **Skills Exposed**:
+  - `search-hotels-live` - Real-time hotel search via Google Hotels API
+  - `get-hotel-details` - Detailed hotel information
+- **Key Features**:
+  - **Live hotel data** from Google Hotels via SerpAPI
+  - **Hotel images** with galleries rendered via A2UI components
+  - Real-time pricing and availability
+  - Location, amenities, reviews, and photos
+  - **Debug logging** for troubleshooting API responses
+  - Configurable (disabled by default)
+- **Requirements**: SerpAPI API key (https://serpapi.com/)
+
 ## Technology Stack
 
 ### Frontend
@@ -99,7 +116,7 @@ A full-stack AI-powered hotel booking system demonstrating multi-agent architect
 - WebSocket for real-time communication
 - TypeScript
 
-### Backend (All Services)
+### Backend (Java Services)
 - Spring Boot 3.2/3.4
 - Spring WebSocket (ADK Root Agent)
 - Spring AI MCP (MCP Hotel Tools)
@@ -107,6 +124,14 @@ A full-stack AI-powered hotel booking system demonstrating multi-agent architect
 - Jackson for JSON processing
 - Lombok for boilerplate reduction
 - Java 21
+
+### Backend (Python Services)
+- Python 3.11 or 3.12 (not 3.13 - pydantic-core lacks wheels)
+- FastAPI 0.104+
+- Uvicorn ASGI server
+- httpx for async HTTP
+- Pydantic for validation
+- SerpAPI for Google Hotels data
 
 ## Project Structure
 
@@ -156,6 +181,12 @@ hotel-booking-system/
 │   │   └── BookingService.java         # Booking logic
 │   └── pom.xml
 │
+├── a2a-serpapi-agent/          # A2A agent for live hotel data (Python)
+│   ├── main.py                         # FastAPI app
+│   ├── requirements.txt
+│   ├── Dockerfile
+│   └── .env.example
+│
 └── docker-compose.yml          # Container orchestration
 ```
 
@@ -187,20 +218,35 @@ cd a2a-booking-agent
 mvn spring-boot:run
 ```
 
-4. **Start ADK Root Agent** (Port 8080):
+4. **(Optional) Start A2A SerpAPI Agent** (Port 8083):
+```bash
+cd a2a-serpapi-agent
+python3.11 -m venv venv  # Use Python 3.11 or 3.12 (not 3.13)
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+# Create .env file with your SerpAPI key:
+echo "SERPAPI_API_KEY=your_key_here" > .env
+uvicorn main:app --host 0.0.0.0 --port 8083
+```
+Then enable in adk-root-agent's `application.properties`:
+```properties
+a2a.serpapi.enabled=true
+```
+
+5. **Start ADK Root Agent** (Port 8080):
 ```bash
 cd adk-root-agent
 mvn spring-boot:run
 ```
 
-5. **Start Angular Frontend** (Port 4200):
+6. **Start Angular Frontend** (Port 4200):
 ```bash
 cd angular-frontend
 npm install
 npm start
 ```
 
-6. **Open the application**: http://localhost:4200
+7. **Open the application**: http://localhost:4200
 
 ### Using Docker Compose
 
@@ -240,30 +286,44 @@ cd a2a-booking-agent
 mvn spring-boot:run
 # Available at http://localhost:8082
 ```
+
+#### A2A SerpAPI Agent (Optional - Real Hotel Data)
 ```bash
-mvn clean install
+cd a2a-serpapi-agent
+
+# Create virtual environment (Python 3.11 or 3.12 required, not 3.13)
+python3.11 -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Configure SerpAPI key
+cp .env.example .env
+# Edit .env and add your SERPAPI_API_KEY
+
+# Run the agent
+uvicorn main:app --host 0.0.0.0 --port 8083
+# Available at http://localhost:8083
 ```
 
-4. Run the application:
-```bash
-mvn spring-boot:run
+To enable in ADK Root Agent, edit `adk-root-agent/src/main/resources/application.properties`:
+```properties
+a2a.serpapi.enabled=true
+a2a.serpapi.url=http://localhost:8083
 ```
 
-The agent backend will be available at `http://localhost:8080`
-
-**Note**: The application uses Google Cloud ADK which requires:
-- Valid GCP project with VertexAI API enabled
-- Proper authentication (Application Default Credentials or service account)
-- GCP_PROJECT_ID environment variable set
+**Note**: Get your SerpAPI key at https://serpapi.com/ (free tier available)
 
 ## Key Features
 
 ### User Experience
-1. **Hotel Search**: Users can search for hotels in any destination
-2. **Pricing Information**: Get detailed pricing with taxes
-3. **Hotel Booking**: Book hotels with confirmation reference
-4. **Multi-Agent Architecture**: Seamless coordination between services
-5. **Error Handling**: Friendly messages when services are unavailable
+1. **Hotel Search**: Users can search for hotels in any destination (mock data)
+2. **Live Hotel Search**: Real-time hotel data via SerpAPI (optional)
+3. **Pricing Information**: Get detailed pricing with taxes
+4. **Hotel Booking**: Book hotels with confirmation reference
+5. **Multi-Agent Architecture**: Seamless coordination between services
+6. **Error Handling**: Friendly messages when services are unavailable
 
 ### Technical Features
 
@@ -285,11 +345,14 @@ The agent backend will be available at `http://localhost:8080`
 - JSON-RPC task execution
 
 #### A2U Components (Agent-to-UI)
-- **Card**: Container component for structured content
+- **Card**: Container component for structured content with title, subtitle, and body
 - **Text**: Typography with variants (heading, body, caption)
 - **Grid**: Flexible grid layout system
 - **Button**: Interactive buttons with icons
 - **JsonTree**: Expandable JSON visualization
+- **Image Gallery**: Grid of hotel images with lazy loading
+- **Divider**: Visual separator between sections
+- **Status**: Success/warning/error status indicators
 
 ### Tool Discovery
 - Background polling service (every 10 seconds)
@@ -326,6 +389,20 @@ Agent: ✅ Booking Confirmed!
        - Total Price: $450.00
 ```
 
+### Example 4: Live Hotel Search (when SerpAPI enabled)
+```
+User: Search for live hotels in London
+Agent: [Calls SerpAPI search-hotels-live skill]
+Agent: [Displays A2UI response with:
+       - Hotel cards with name, rating, price, location
+       - Image galleries directly below each hotel
+       - Real-time pricing from Google Hotels
+       - Amenities and review counts]
+```
+
+**Note**: Live hotel search results are rendered directly as A2UI components 
+for immediate display, bypassing LLM formatting for faster response times.
+
 ## API Endpoints
 
 ### Angular Frontend
@@ -344,13 +421,31 @@ Agent: ✅ Booking Confirmed!
 - **A2A Endpoint**: `http://localhost:8082/a2a`
 - **Health**: `http://localhost:8082/actuator/health`
 
+### A2A SerpAPI Agent (Optional)
+- **Agent Card**: `http://localhost:8083/.well-known/agent.json`
+- **A2A Endpoint**: `http://localhost:8083/a2a`
+- **Health**: `http://localhost:8083/health`
+
 ## Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `GOOGLE_CLOUD_PROJECT` | Yes | GCP Project ID with Vertex AI enabled |
-| `GOOGLE_CLOUD_LOCATION` | Yes | GCP region (e.g., `us-central1`) |
-| `GOOGLE_APPLICATION_CREDENTIALS` | Optional | Path to service account JSON |
+| Variable | Service | Required | Description |
+|----------|---------|----------|-------------|
+| `GOOGLE_CLOUD_PROJECT` | ADK Root Agent | Yes | GCP Project ID with Vertex AI enabled |
+| `GOOGLE_CLOUD_LOCATION` | ADK Root Agent | Yes | GCP region (e.g., `us-central1`) |
+| `GOOGLE_APPLICATION_CREDENTIALS` | ADK Root Agent | Optional | Path to service account JSON |
+| `SERPAPI_API_KEY` | SerpAPI Agent | Yes* | SerpAPI key for Google Hotels (*only if using SerpAPI agent) |
+
+### ADK Root Agent Configuration
+Edit `adk-root-agent/src/main/resources/application.properties`:
+```properties
+# A2A Booking Agent (enabled by default)
+a2a.booking.enabled=true
+a2a.booking.url=http://localhost:8082
+
+# A2A SerpAPI Agent (disabled by default)
+a2a.serpapi.enabled=false
+a2a.serpapi.url=http://localhost:8083
+```
 
 ## Development
 
@@ -359,13 +454,16 @@ Agent: ✅ Booking Confirmed!
 # Terminal 1 - MCP Server
 cd mcp-hotel-tools && mvn spring-boot:run
 
-# Terminal 2 - A2A Agent  
+# Terminal 2 - A2A Booking Agent  
 cd a2a-booking-agent && mvn spring-boot:run
 
-# Terminal 3 - ADK Root Agent
+# Terminal 3 - A2A SerpAPI Agent (Optional)
+cd a2a-serpapi-agent && source venv/bin/activate && uvicorn main:app --port 8083
+
+# Terminal 4 - ADK Root Agent
 cd adk-root-agent && mvn spring-boot:run
 
-# Terminal 4 - Frontend
+# Terminal 5 - Frontend
 cd angular-frontend && npm start
 ```
 
@@ -375,6 +473,12 @@ cd angular-frontend && npm start
 cd mcp-hotel-tools && mvn clean package
 cd a2a-booking-agent && mvn clean package
 cd adk-root-agent && mvn clean package
+
+# Build Python service (SerpAPI Agent)
+cd a2a-serpapi-agent
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 
 # Build frontend
 cd angular-frontend && npm run build
@@ -409,8 +513,15 @@ cd angular-frontend && npm run build
 ### Services Not Discovered
 The ADK Root Agent polls for MCP and A2A services every 10 seconds. If services aren't available:
 1. Verify MCP server is running on port 8081
-2. Verify A2A agent is running on port 8082
-3. Check logs: `tail -f /tmp/mcp.log` or `/tmp/a2a.log`
+2. Verify A2A Booking Agent is running on port 8082
+3. Verify A2A SerpAPI Agent is running on port 8083 (if enabled)
+4. Check logs: `tail -f /tmp/mcp.log` or `/tmp/a2a.log`
+
+### SerpAPI Agent Not Working
+1. Verify `a2a.serpapi.enabled=true` in application.properties
+2. Verify `.env` file contains `SERPAPI_API_KEY=your_key`
+3. Test the agent: `curl http://localhost:8083/health`
+4. Check SerpAPI key validity at https://serpapi.com/manage-api-key
 
 ### GCP Authentication Issues
 ```bash

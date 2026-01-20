@@ -81,9 +81,10 @@
                 </div>
               </div>
 
-              <!-- Other A2UI components rendered as HTML -->
+              <!-- Other A2UI components rendered as HTML - display:contents removes wrapper from layout -->
               <div
                 *ngIf="component.type !== 'json'"
+                class="a2ui-component-wrapper"
                 [innerHTML]="renderSingleComponent(component)"
               ></div>
             </ng-container>
