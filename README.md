@@ -6,31 +6,31 @@ A full-stack AI-powered hotel booking system demonstrating multi-agent architect
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│                            Hotel Booking System                                  │
+│                            Hotel Booking System                                 │
 ├─────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                 │
-│  ┌───────────────────┐        WebSocket       ┌───────────────────────┐        │
-│  │  Angular Frontend │◄──────────────────────►│   ADK Root Agent      │        │
-│  │  (Port 4200)      │                        │   (Port 8080)         │        │
-│  │                   │                        │                       │        │
-│  │  - Chat UI        │                        │  - Google ADK SDK     │        │
-│  │  - AG-UI Protocol │                        │  - Gemini/Vertex AI   │        │
-│  │  - A2U Components │                        │  - Tool Discovery     │        │
-│  └───────────────────┘                        │  - Session Management │        │
-│                                               └───────────┬───────────┘        │
-│                                                           │                    │
-│              ┌────────────────────────────────────────────┼────────────────┐   │
-│              │                            │               │                │   │
-│              ▼                            ▼               ▼                │   │
-│  ┌─────────────────────┐   ┌─────────────────────┐   ┌─────────────────────┐  │
-│  │  MCP Hotel Tools    │   │  A2A Booking Agent  │   │ A2A SerpAPI Agent   │  │
-│  │  (Port 8081)        │   │  (Port 8082)        │   │ (Port 8083)         │  │
-│  │                     │   │                     │   │ [Optional]          │  │
-│  │  - searchHotels     │   │  - book-hotel       │   │                     │  │
-│  │  - getHotelPrice    │   │  - A2A Protocol     │   │ - searchHotelsLive  │  │
-│  │  - MCP Protocol     │   │  - JSON-RPC         │   │ - getHotelDetails   │  │
-│  └─────────────────────┘   └─────────────────────┘   │ - Google Hotels API │  │
-│                                                       └─────────────────────┘  │
+│  ┌───────────────────┐        WebSocket       ┌───────────────────────┐         │
+│  │  Angular Frontend │◄──────────────────────►│   ADK Root Agent      │         │
+│  │  (Port 4200)      │                        │   (Port 8080)         │         │
+│  │                   │                        │                       │         │
+│  │  - Chat UI        │                        │  - Google ADK SDK     │         │
+│  │  - AG-UI Protocol │                        │  - Gemini/Vertex AI   │         │
+│  │  - A2U Components │                        │  - Tool Discovery     │         │
+│  └───────────────────┘                        │  - Session Management │         │
+│                                               └───────────┬───────────┘         │
+│                                                           │                     │
+│              ┌────────────────────────────────────────────┼────────────────┐    │
+│              │                            │               │                │    │
+│              ▼                            ▼               ▼                │    │
+│  ┌─────────────────────┐   ┌─────────────────────┐   ┌─────────────────────┐    │
+│  │  MCP Hotel Tools    │   │  A2A Booking Agent  │   │ A2A SerpAPI Agent   │    │
+│  │  (Port 8081)        │   │  (Port 8082)        │   │ (Port 8083)         │    │
+│  │                     │   │                     │   │ [Optional]          │    │
+│  │  - searchHotels     │   │  - book-hotel       │   │                     │    │
+│  │  - getHotelPrice    │   │  - A2A Protocol     │   │ - searchHotelsLive  │    │
+│  │  - MCP Protocol     │   │  - JSON-RPC         │   │ - getHotelDetails   │    │
+│  └─────────────────────┘   └─────────────────────┘   │ - Google Hotels API │    │
+│                                                      └─────────────────────┘    │
 │                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```
