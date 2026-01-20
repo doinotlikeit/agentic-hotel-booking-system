@@ -14,6 +14,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTreeModule } from '@angular/material/tree';
+import { MatTooltipModule } from '@angular/material/tooltip';
 
 // Components
 import { AppComponent } from './app.component';
@@ -51,7 +52,8 @@ import { AgUiService } from './services/ag-ui.service';
     MatChipsModule,
     MatDividerModule,
     MatProgressSpinnerModule,
-    MatTreeModule
+    MatTreeModule,
+    MatTooltipModule
   ],
   providers: [
     WebSocketService,

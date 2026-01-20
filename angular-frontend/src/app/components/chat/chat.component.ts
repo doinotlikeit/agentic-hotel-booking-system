@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef, NgZone } from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { WebSocketService, ConnectionStatus } from '../../services/websocket.service';
 import { AgUiService, AgentMessage } from '../../services/ag-ui.service';
@@ -6,6 +6,9 @@ import { A2uiRendererService } from '../../services/a2ui-renderer.service';
 import { MarkdownService } from '../../services/markdown.service';
 import { Subscription } from 'rxjs';
 import { environment } from '../../../environments/environment';
+
+// Web Speech API types
+declare var webkitSpeechRecognition: any;
 
 @Component({
   selector: 'app-chat',
@@ -26,6 +29,11 @@ export class ChatComponent implements OnInit, OnDestroy {
   isThinking: boolean = false;
   thinkingMessage: string = 'Processing...';
   
+  // Voice input state
+  isListening: boolean = false;
+  voiceSupported: boolean = false;
+  private speechRecognition: any;
+  
   // Cache for rendered A2UI content to prevent re-rendering on every change detection
   private a2uiRenderCache = new Map<string, SafeHtml>();
   
@@ -41,8 +49,11 @@ export class ChatComponent implements OnInit, OnDestroy {
     private agUiService: AgUiService,
     private a2uiRenderer: A2uiRendererService,
     private markdownService: MarkdownService,
-    private sanitizer: DomSanitizer
-  ) {}
+    private sanitizer: DomSanitizer,
+    private ngZone: NgZone
+  ) {
+    this.initSpeechRecognition();
+  }
 
   ngOnInit(): void {
     // Connect to WebSocket
@@ -71,6 +82,83 @@ export class ChatComponent implements OnInit, OnDestroy {
         }
       })
     );
+  }
+
+  /**
+   * Initialize Web Speech API for voice input
+   */
+  private initSpeechRecognition(): void {
+    // Check for browser support
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    
+    if (SpeechRecognition) {
+      this.voiceSupported = true;
+      this.speechRecognition = new SpeechRecognition();
+      this.speechRecognition.continuous = false;
+      this.speechRecognition.interimResults = true;
+      this.speechRecognition.lang = 'en-US';
+      
+      this.speechRecognition.onstart = () => {
+        this.ngZone.run(() => {
+          this.isListening = true;
+        });
+      };
+      
+      this.speechRecognition.onresult = (event: any) => {
+        this.ngZone.run(() => {
+          let finalTranscript = '';
+          let interimTranscript = '';
+          
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+              finalTranscript += transcript;
+            } else {
+              interimTranscript += transcript;
+            }
+          }
+          
+          // Update input with final or interim transcript
+          if (finalTranscript) {
+            this.currentMessage = finalTranscript;
+          } else if (interimTranscript) {
+            this.currentMessage = interimTranscript;
+          }
+        });
+      };
+      
+      this.speechRecognition.onerror = (event: any) => {
+        this.ngZone.run(() => {
+          console.error('Speech recognition error:', event.error);
+          this.isListening = false;
+        });
+      };
+      
+      this.speechRecognition.onend = () => {
+        this.ngZone.run(() => {
+          this.isListening = false;
+        });
+      };
+    } else {
+      this.voiceSupported = false;
+      console.log('Speech recognition not supported in this browser');
+    }
+  }
+
+  /**
+   * Toggle voice input
+   */
+  toggleVoiceInput(): void {
+    if (!this.voiceSupported) {
+      return;
+    }
+    
+    if (this.isListening) {
+      this.speechRecognition.stop();
+    } else {
+      this.currentMessage = ''; // Clear input before listening
+      this.speechRecognition.start();
+    }
   }
 
   /**
