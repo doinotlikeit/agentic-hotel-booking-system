@@ -121,9 +121,11 @@
 
   <!-- Input Area -->
   <div class="input-area">
-    <div style="width: 100%">
+    <div class="input-row">
       <mat-form-field class="message-input-field" appearance="fill">
-        <mat-label>Type your message...</mat-label>
+        <mat-label>{{
+          isListening ? "Listening..." : "Type your message..."
+        }}</mat-label>
         <textarea
           matInput
           #messageInput
@@ -135,6 +137,20 @@
         >
         </textarea>
       </mat-form-field>
+
+      <!-- Voice Input Button -->
+      <button
+        *ngIf="voiceSupported"
+        mat-mini-fab
+        [color]="isListening ? 'warn' : 'accent'"
+        (click)="toggleVoiceInput()"
+        [disabled]="connectionStatus !== 'Connected'"
+        class="voice-button"
+        [class.listening]="isListening"
+        [matTooltip]="isListening ? 'Stop listening' : 'Start voice input'"
+      >
+        <mat-icon>{{ isListening ? "mic_off" : "mic" }}</mat-icon>
+      </button>
     </div>
 
     <div class="button-group">
