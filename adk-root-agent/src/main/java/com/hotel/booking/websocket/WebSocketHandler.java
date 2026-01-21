@@ -89,10 +89,16 @@ public class WebSocketHandler extends TextWebSocketHandler {
             AgentMessage userMessage = objectMapper.treeToValue(messageNode, AgentMessage.class);
             state.addMessage(userMessage);
 
+            // Detect if user wants the response read aloud and strip the command from the
+            // message
+            final boolean readAloud = detectReadAloudRequest(content);
+            final String processedContent = readAloud ? stripReadAloudCommand(content) : content;
+            log.info("User wants readAloud: {}, original: [{}], processed: [{}]", readAloud, content, processedContent);
+
             // Process message with ADK-based root agent
-            rootAgent.processAsync(state, content, responseText -> {
+            rootAgent.processAsync(state, processedContent, responseText -> {
                 try {
-                    sendMessage(session, responseText);
+                    sendMessage(session, responseText, readAloud);
                 } catch (IOException e) {
                     log.error("Error sending agent response to UI", e);
                 }
@@ -117,8 +123,12 @@ public class WebSocketHandler extends TextWebSocketHandler {
     }
 
     private void sendMessage(WebSocketSession session, String message) throws IOException {
+        sendMessage(session, message, false);
+    }
+
+    private void sendMessage(WebSocketSession session, String message, boolean readAloud) throws IOException {
         if (session.isOpen()) {
-            log.info("=== sendMessage called ===");
+            log.info("=== sendMessage called (readAloud={}) ===", readAloud);
             log.info("Raw message: {}", message);
 
             Map<String, Object> messageData = new HashMap<>();
@@ -199,6 +209,12 @@ public class WebSocketHandler extends TextWebSocketHandler {
                 log.info("Not JSON or parse error, treating as text: {}", e.getMessage());
             }
 
+            // Add readAloud flag if user requested it
+            if (readAloud) {
+                messageData.put("readAloud", true);
+                log.info("✅ Added readAloud=true to response");
+            }
+
             Map<String, Object> response = new HashMap<>();
             response.put("type", "chat");
             response.put("message", messageData);
@@ -220,6 +236,81 @@ public class WebSocketHandler extends TextWebSocketHandler {
             String json = objectMapper.writeValueAsString(errorResponse);
             session.sendMessage(new TextMessage(json));
         }
+    }
+
+    /**
+     * Detect if user is requesting to read results aloud.
+     * Matches phrases like "read results", "read it", "read that", "speak results",
+     * etc.
+     */
+    private boolean detectReadAloudRequest(String userMessage) {
+        if (userMessage == null) {
+            return false;
+        }
+        String lower = userMessage.toLowerCase().trim();
+        return lower.contains("read results") ||
+                lower.contains("read result") ||
+                lower.contains("read it") ||
+                lower.contains("read that") ||
+                lower.contains("read response") ||
+                lower.contains("read the results") ||
+                lower.contains("read out") ||
+                lower.contains("read out loud") ||
+                lower.contains("speak results") ||
+                lower.contains("say it") ||
+                lower.contains("read aloud") ||
+                lower.contains("read this") ||
+                lower.contains("and read") ||
+                lower.contains("say the results") ||
+                lower.contains("tell me the results");
+    }
+
+    /**
+     * Strip read aloud commands from the user message.
+     * E.g., "search hotels in Paris read results" -> "search hotels in Paris"
+     */
+    private String stripReadAloudCommand(String userMessage) {
+        if (userMessage == null) {
+            return "";
+        }
+
+        // List of phrases to strip (order matters - longer phrases first)
+        String[] phrasesToStrip = {
+                "and read the results",
+                "read the results",
+                "and read results",
+                "read out loud",
+                "tell me the results",
+                "say the results",
+                "speak results",
+                "read response",
+                "read results",
+                "read result",
+                "read aloud",
+                "and read",
+                "read out",
+                "read this",
+                "read that",
+                "read it",
+                "say it"
+        };
+
+        String result = userMessage;
+        String lowerResult = result.toLowerCase();
+
+        for (String phrase : phrasesToStrip) {
+            int index = lowerResult.indexOf(phrase);
+            if (index != -1) {
+                // Remove the phrase (case-insensitive)
+                result = result.substring(0, index) + result.substring(index + phrase.length());
+                lowerResult = result.toLowerCase();
+            }
+        }
+
+        // Clean up extra whitespace
+        result = result.replaceAll("\\s+", " ").trim();
+
+        return result;
     }
 
     @Override

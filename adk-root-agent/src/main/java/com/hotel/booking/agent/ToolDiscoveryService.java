@@ -346,6 +346,20 @@ public class ToolDiscoveryService {
     }
 
     /**
+     * Check if core tools (MCP) are available - minimum required to run
+     */
+    public boolean areCoreToolsAvailable() {
+        return isMcpAvailable();
+    }
+
+    /**
+     * Check if any tools are available at all
+     */
+    public boolean areAnyToolsAvailable() {
+        return !getAllTools().isEmpty();
+    }
+
+    /**
      * Get a friendly status message about tool availability
      */
     public String getToolAvailabilityStatus() {
